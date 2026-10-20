@@ -41,3 +41,35 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('smokeTest', Test) {
+	group = 'verification'
+	description = 'Runs the critical backend smoke tests.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	failOnNoDiscoveredTests = true
+
+	useJUnitPlatform {
+		includeTags 'smoke'
+	}
+
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		exceptionFormat = 'full'
+	}
+
+	afterSuite { descriptor, result ->
+		if (descriptor.parent == null) {
+			logger.lifecycle(
+					"Smoke tests: ${result.testCount} executed, " +
+							"${result.successfulTestCount} passed, " +
+							"${result.failedTestCount} failed, " +
+							"${result.skippedTestCount} skipped"
+			)
+			if (result.testCount == 0) {
+				throw new GradleException('No smoke tests were executed')
+			}
+		}
+	}
+}
