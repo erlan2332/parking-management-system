@@ -19,3 +19,11 @@ application:
       secret-base64: ${JWT_SECRET_BASE64:}
       issuer: parking-management-system
       access-token-ttl: PT1H
+
+parking:
+  pricing:
+    zone-id: ${PARKING_PRICING_ZONE_ID:Asia/Bishkek}
+    day-start: "${PARKING_DAY_START:08:00}"
+    day-end: "${PARKING_DAY_END:20:00}"
+    day-rate-per-minute: ${PARKING_DAY_RATE_PER_MINUTE:2.00}
+    night-rate-per-minute: ${PARKING_NIGHT_RATE_PER_MINUTE:1.00}

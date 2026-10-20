@@ -150,3 +150,26 @@
 - Added controlled-clock, database-constraint, ownership, secured HTTP, and
   independently transacted concurrency tests, including walk-in versus hold
   creation on the same spot.
+
+## Stage 07 — Day and Night Parking Pricing
+
+- Added an immutable, validated pricing configuration with an explicit parking
+  zone, day boundaries, and non-negative `BigDecimal` rates. Environment
+  variables can override every value without coupling pricing to database or
+  security configuration.
+- Kept the calculator independent of HTTP and persistence. It accepts actual
+  entry and exit `Instant` values and returns a reusable cost breakdown with
+  day/night seconds, rates, component costs, total cost, and `KGS` currency.
+- Split each visit at local tariff boundaries in `Asia/Bishkek` using
+  half-open intervals. The algorithm handles both tariff transitions,
+  midnight, multiple calendar days, and input timestamps with different UTC
+  offsets without consulting the host system time zone.
+- Calculate costs from whole seconds with `BigDecimal`. Component numerators
+  are accumulated before division, and the combined total is rounded once to
+  two decimal places using `HALF_UP`, avoiding per-segment minute rounding.
+- Added an owner-scoped secured cost endpoint for completed visits. Foreign
+  visits use the same 404 as missing visits, while an active visit returns a
+  conflict because no final exit time exists.
+- Deliberately left the quote transient. Until invoices snapshot rates and the
+  amount in a later stage, recalculating historical visits uses the current
+  application configuration.

@@ -1,5 +1,7 @@
 package com.parking.backend.visit;
 
+import com.parking.backend.common.exception.ParkingVisitNotCompletedException;
+import com.parking.backend.common.exception.ParkingVisitNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,5 +19,15 @@ public class ParkingVisitService {
 	@Transactional(readOnly = true)
 	public List<ParkingVisitEntity> getMyVisits(Long userId) {
 		return parkingVisitRepository.findAllByVehicle_User_IdOrderByEnteredAtDescIdDesc(userId);
+	}
+
+	@Transactional(readOnly = true)
+	public ParkingVisitEntity getCompletedVisit(Long visitId, Long userId) {
+		ParkingVisitEntity visit = parkingVisitRepository.findByIdAndVehicle_User_Id(visitId, userId)
+				.orElseThrow(ParkingVisitNotFoundException::new);
+		if (visit.getExitedAt() == null) {
+			throw new ParkingVisitNotCompletedException();
+		}
+		return visit;
 	}
 }
