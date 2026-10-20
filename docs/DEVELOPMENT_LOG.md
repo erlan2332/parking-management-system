@@ -122,3 +122,31 @@
 - Added focused unit, PostgreSQL integration, secured MockMvc, controlled-clock,
   and real concurrent-transaction tests. WebSocket broadcasting remains a
   later-stage concern; clients currently refresh state through REST.
+
+## Stage 06 — Barrier Simulator and Parking Visits
+
+- Added `parking_visits` as the source of truth for physical occupancy. Partial
+  PostgreSQL unique indexes enforce one active visit per vehicle and spot, and
+  a unique reservation reference prevents booking reuse even if an application
+  pre-check races.
+- Kept mutation lock order consistent with reservations: parking spot, vehicle,
+  then the related reservation or visit. Walk-in allocation reads candidates
+  in natural order, locks each candidate row, and rechecks visits and booking
+  obligations after lock acquisition.
+- Applied a conservative open-ended walk-in policy. A spot with any effective
+  hold, active reservation, or checked-in reservation is not assigned because
+  the walk-in exit time is unknown. The same rule rejects walk-in entry for a
+  vehicle with a future obligation.
+- Reservation entry is allowed only in the half-open window beginning at
+  `startAt` and ending at the earlier of `endAt` and `startAt + 15 minutes`.
+  Entry atomically changes `ACTIVE` to `CHECKED_IN` and links the new visit.
+- Exit records precise server time without rounding. It completes the visit and
+  changes a linked reservation from `CHECKED_IN` to `COMPLETED`; pricing and
+  invoice generation remain separate future work.
+- Extended parking state calculation with active visits. Physical occupancy has
+  priority over reservation display and conservatively blocks every future
+  interval until an actual exit is recorded. Queries load all active visits in
+  one pass rather than per parking spot.
+- Added controlled-clock, database-constraint, ownership, secured HTTP, and
+  independently transacted concurrency tests, including walk-in versus hold
+  creation on the same spot.

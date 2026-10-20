@@ -7,6 +7,7 @@ import com.parking.backend.parking.ParkingSpotRepository;
 import com.parking.backend.user.UserEntity;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
+import com.parking.backend.visit.ParkingVisitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,8 @@ class ReservationServiceTest {
 	private ParkingSpotRepository parkingSpotRepository;
 	@Mock
 	private VehicleRepository vehicleRepository;
+	@Mock
+	private ParkingVisitRepository parkingVisitRepository;
 
 	private ReservationService reservationService;
 	private UserEntity user;
@@ -139,6 +142,7 @@ class ReservationServiceTest {
 				reservationRepository,
 				parkingSpotRepository,
 				vehicleRepository,
+				parkingVisitRepository,
 				Clock.fixed(instant, ZoneOffset.UTC)
 		);
 	}

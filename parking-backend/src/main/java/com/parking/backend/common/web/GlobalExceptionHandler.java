@@ -7,11 +7,15 @@ import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.InvalidPasswordException;
 import com.parking.backend.common.exception.InvalidPlateNumberException;
 import com.parking.backend.common.exception.InvalidReservationRequestException;
+import com.parking.backend.common.exception.NoActiveVisitException;
+import com.parking.backend.common.exception.NoAvailableParkingSpotException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
 import com.parking.backend.common.exception.ReservationConflictException;
+import com.parking.backend.common.exception.ReservationEntryConflictException;
 import com.parking.backend.common.exception.ReservationNotFoundException;
 import com.parking.backend.common.exception.UserNotFoundException;
 import com.parking.backend.common.exception.VehicleNotFoundException;
+import com.parking.backend.common.exception.VehicleAlreadyParkedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -75,6 +79,26 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ReservationConflictException.class)
 	ResponseEntity<ApiErrorResponse> handleReservationConflict(ReservationConflictException exception) {
 		return error(HttpStatus.CONFLICT, "RESERVATION_CONFLICT", exception.getMessage());
+	}
+
+	@ExceptionHandler(VehicleAlreadyParkedException.class)
+	ResponseEntity<ApiErrorResponse> handleVehicleAlreadyParked(VehicleAlreadyParkedException exception) {
+		return error(HttpStatus.CONFLICT, "VEHICLE_ALREADY_PARKED", exception.getMessage());
+	}
+
+	@ExceptionHandler(NoAvailableParkingSpotException.class)
+	ResponseEntity<ApiErrorResponse> handleNoAvailableParkingSpot(NoAvailableParkingSpotException exception) {
+		return error(HttpStatus.CONFLICT, "NO_AVAILABLE_PARKING_SPOT", exception.getMessage());
+	}
+
+	@ExceptionHandler(ReservationEntryConflictException.class)
+	ResponseEntity<ApiErrorResponse> handleReservationEntryConflict(ReservationEntryConflictException exception) {
+		return error(HttpStatus.CONFLICT, "RESERVATION_ENTRY_CONFLICT", exception.getMessage());
+	}
+
+	@ExceptionHandler(NoActiveVisitException.class)
+	ResponseEntity<ApiErrorResponse> handleNoActiveVisit(NoActiveVisitException exception) {
+		return error(HttpStatus.CONFLICT, "NO_ACTIVE_VISIT", exception.getMessage());
 	}
 
 	@ExceptionHandler(InvalidPlateNumberException.class)

@@ -33,6 +33,44 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			Collection<ReservationStatus> statuses
 	);
 
+	@EntityGraph(attributePaths = "spot")
+	List<ReservationEntity> findAllByVehicle_IdAndStatusOrderByStartAtAscIdAsc(
+			Long vehicleId,
+			ReservationStatus status
+	);
+
+	@Query("""
+			SELECT CASE WHEN COUNT(reservation) > 0 THEN true ELSE false END
+			FROM ReservationEntity reservation
+			WHERE reservation.vehicle.id = :vehicleId
+			  AND (
+			      reservation.status IN :persistentStatuses
+			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
+			  )
+			""")
+	boolean existsBlockingObligationForVehicle(
+			@Param("vehicleId") Long vehicleId,
+			@Param("now") Instant now,
+			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
+	);
+
+	@Query("""
+			SELECT CASE WHEN COUNT(reservation) > 0 THEN true ELSE false END
+			FROM ReservationEntity reservation
+			WHERE reservation.spot.id = :spotId
+			  AND (
+			      reservation.status IN :persistentStatuses
+			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
+			  )
+			""")
+	boolean existsBlockingObligationForSpot(
+			@Param("spotId") Long spotId,
+			@Param("now") Instant now,
+			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
+	);
+
 	@Query("""
 			SELECT reservation
 			FROM ReservationEntity reservation

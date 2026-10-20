@@ -15,6 +15,8 @@ public interface VehicleRepository extends JpaRepository<VehicleEntity, Long> {
 
 	Optional<VehicleEntity> findByNormalizedPlate(String normalizedPlate);
 
+	Optional<VehicleEntity> findByNormalizedPlateAndUser_Id(String normalizedPlate, Long userId);
+
 	Optional<VehicleEntity> findByIdAndUser_Id(Long vehicleId, Long userId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -4,6 +4,7 @@ import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
 import com.parking.backend.reservation.ReservationRepository;
 import com.parking.backend.reservation.ReservationStatus;
+import com.parking.backend.visit.ParkingVisitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,13 +37,20 @@ class ParkingSpotServiceTest {
 	private ParkingSpotRepository parkingSpotRepository;
 	@Mock
 	private ReservationRepository reservationRepository;
+	@Mock
+	private ParkingVisitRepository parkingVisitRepository;
 
 	private ParkingSpotService parkingSpotService;
 
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(Instant.parse("2026-12-01T08:00:00Z"), ZoneOffset.UTC);
-		parkingSpotService = new ParkingSpotService(parkingSpotRepository, reservationRepository, clock);
+		parkingSpotService = new ParkingSpotService(
+				parkingSpotRepository,
+				reservationRepository,
+				parkingVisitRepository,
+				clock
+		);
 	}
 
 	@Test
@@ -91,6 +99,7 @@ class ParkingSpotServiceTest {
 		);
 		verifyNoInteractions(parkingSpotRepository);
 		verifyNoInteractions(reservationRepository);
+		verifyNoInteractions(parkingVisitRepository);
 	}
 
 	@Test
@@ -104,6 +113,7 @@ class ParkingSpotServiceTest {
 		);
 		verifyNoInteractions(parkingSpotRepository);
 		verifyNoInteractions(reservationRepository);
+		verifyNoInteractions(parkingVisitRepository);
 	}
 
 	@Test
@@ -141,5 +151,6 @@ class ParkingSpotServiceTest {
 				eq(ReservationStatus.HELD),
 				anyCollection()
 		)).thenReturn(List.of());
+		when(parkingVisitRepository.findAllByExitedAtIsNull()).thenReturn(List.of());
 	}
 }
