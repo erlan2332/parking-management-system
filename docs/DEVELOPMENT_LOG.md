@@ -34,3 +34,26 @@
   concurrent inserts.
 - Added unit tests for normalization and service rules plus PostgreSQL-backed
   integration tests using a separate `TEST_DB_*` connection.
+
+## Stage 03 — JWT Authentication and Driver API
+
+- Added Spring Security with the OAuth2 Resource Server JWT support instead of
+  a custom authentication filter or custom cryptography.
+- Configured stateless request processing. Only registration and login POST
+  endpoints are public; every other route and HTTP method requires a valid
+  Bearer token.
+- Added BCrypt password hashing with a ten-character minimum and an explicit
+  72-byte UTF-8 limit matching BCrypt's input constraint.
+- Added HS256 access tokens containing user ID subject, issuer, issued time,
+  and expiration. Runtime startup fails when `JWT_SECRET_BASE64` is missing,
+  malformed, or shorter than 256 bits.
+- Added profile and vehicle REST DTOs so persistence entities and password
+  hashes never form part of HTTP responses. Vehicle ownership always comes
+  from the validated JWT subject, never from request data.
+- Reused `VehicleService` and `PlateNormalizer`; the only service extension is
+  an owner-scoped vehicle lookup that returns the same 404 for missing and
+  foreign vehicles.
+- Added uniform validation, authentication, authorization, not-found, and
+  conflict responses without exposing SQL or framework details.
+- Added unit tests plus PostgreSQL/MockMvc integration tests with active
+  security filters, including concurrent registration and invalid JWT cases.

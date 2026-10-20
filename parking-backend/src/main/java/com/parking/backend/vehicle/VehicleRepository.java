@@ -11,6 +11,8 @@ public interface VehicleRepository extends JpaRepository<VehicleEntity, Long> {
 
 	Optional<VehicleEntity> findByNormalizedPlate(String normalizedPlate);
 
+	Optional<VehicleEntity> findByIdAndUser_Id(Long vehicleId, Long userId);
+
 	boolean existsByNormalizedPlate(String normalizedPlate);
 
 	boolean existsByIdAndUser_Id(Long vehicleId, Long userId);

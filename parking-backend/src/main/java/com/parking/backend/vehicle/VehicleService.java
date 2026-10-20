@@ -3,9 +3,10 @@ package com.parking.backend.vehicle;
 import com.parking.backend.common.exception.DuplicateVehiclePlateException;
 import com.parking.backend.common.exception.InvalidPlateNumberException;
 import com.parking.backend.common.exception.UserNotFoundException;
+import com.parking.backend.common.exception.VehicleNotFoundException;
+import com.parking.backend.common.persistence.DatabaseConstraintViolationDetector;
 import com.parking.backend.user.UserEntity;
 import com.parking.backend.user.UserRepository;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +47,7 @@ public class VehicleService {
 		try {
 			return vehicleRepository.saveAndFlush(new VehicleEntity(user, displayPlate, normalizedPlate));
 		} catch (DataIntegrityViolationException exception) {
-			if (isNormalizedPlateConflict(exception)) {
+			if (DatabaseConstraintViolationDetector.hasConstraint(exception, UNIQUE_PLATE_CONSTRAINT)) {
 				throw new DuplicateVehiclePlateException(normalizedPlate, exception);
 			}
 			throw exception;
@@ -76,6 +77,12 @@ public class VehicleService {
 		return vehicleRepository.existsByIdAndUser_Id(vehicleId, userId);
 	}
 
+	@Transactional(readOnly = true)
+	public VehicleEntity getVehicleByIdForUser(Long vehicleId, Long userId) {
+		return vehicleRepository.findByIdAndUser_Id(vehicleId, userId)
+				.orElseThrow(() -> new VehicleNotFoundException(vehicleId));
+	}
+
 	private UserEntity findUser(Long userId) {
 		return userRepository.findById(userId)
 				.orElseThrow(() -> new UserNotFoundException(userId));
@@ -94,14 +101,4 @@ public class VehicleService {
 		return displayPlate;
 	}
 
-	private static boolean isNormalizedPlateConflict(Throwable exception) {
-		Throwable currentCause = exception;
-		while (currentCause != null) {
-			if (currentCause instanceof ConstraintViolationException constraintViolation) {
-				return UNIQUE_PLATE_CONSTRAINT.equals(constraintViolation.getConstraintName());
-			}
-			currentCause = currentCause.getCause();
-		}
-		return false;
-	}
 }

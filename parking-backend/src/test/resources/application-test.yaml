@@ -3,3 +3,8 @@ spring:
     url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/parking_test_db}
     username: ${TEST_DB_USERNAME:parking_user}
     password: ${TEST_DB_PASSWORD:}
+
+application:
+  security:
+    jwt:
+      secret-base64: ${TEST_JWT_SECRET_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
