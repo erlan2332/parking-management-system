@@ -173,3 +173,31 @@
 - Deliberately left the quote transient. Until invoices snapshot rates and the
   amount in a later stage, recalculating historical visits uses the current
   application configuration.
+
+## Stage 08 — Parking Invoices and Billing History
+
+- Added `invoices` through V6 without changing earlier migrations. A unique
+  visit reference and PostgreSQL checks enforce one `ISSUED` KGS invoice per
+  visit, consistent non-negative durations, rates and amounts, and valid
+  timestamp ordering. The restrictive foreign key protects billing history.
+- Kept pricing in `ParkingPricingService`. It now exposes the configured zone
+  and high-precision day/night components while still deriving the authoritative
+  two-decimal total from the combined numerator with one `HALF_UP` rounding.
+- Made exit completion and invoice insertion one transaction. Invoice
+  persistence failure rolls back the exit; a projection-based lock target
+  prevents stale managed visit state during concurrent exits, and the database
+  unique constraint remains the final protection against duplicate billing.
+- Snapshotted the actual interval, plate, spot, zone, durations, rates, cost
+  components, total, and currency. Issued amounts are consequently independent
+  of later configuration changes, and invoice numbers are stable derivatives
+  of database IDs rather than a separate sequence.
+- Added secured, owner-scoped DTO APIs for invoice history, invoice details,
+  and invoice lookup by visit. Missing and foreign invoices are indistinguishable
+  to callers, list loading fetches the required visit in one query, and GET
+  requests never create financial data.
+- Made the existing visit-cost endpoint prefer the persisted invoice snapshot.
+  Pre-V6 completed visits without snapshots may still be quoted using current
+  rates, but are not backfilled or represented as historically issued invoices.
+- Added focused PostgreSQL and MockMvc tests for snapshots, ownership, stable
+  ordering, legacy visits, constraints, rollback, idempotent issue handling,
+  and two independently transacted concurrent exits without timing sleeps.

@@ -22,14 +22,16 @@ Flyway manages parking spots, users, vehicles, and reservations. Drivers can
 register, log in, receive a 60-minute JWT access token, manage their vehicles,
 hold a parking spot for three minutes, and confirm or cancel a reservation
 through a secured REST API. The barrier simulator supports reservation and
-walk-in entry, physical exit, and visit history. Completed visits can be priced
-with configurable day and night rates. The frontend is not implemented yet.
+walk-in entry, physical exit, and visit history. Exit atomically completes the
+visit and issues an invoice that preserves the applied day/night rates and
+amount. Drivers can review their invoice history through secured REST APIs.
+The frontend is not implemented yet.
 
 ## Planned Features
 
 - Driver profiles and vehicles
 - Parking spot management
-- Invoice and payment history
+- Payments and payment history
 - WebSocket real-time updates
 - Email notifications
 
@@ -125,6 +127,11 @@ active visit per vehicle and per parking spot, while a unique reservation link
 prevents using one booking for multiple visits. Visit history is retained after
 exit and is never cascade-deleted with a vehicle, spot, or reservation.
 
+Migration V6 adds `invoices`. Each completed visit can have at most one invoice,
+and PostgreSQL validates its currency, non-negative durations, rates and costs,
+duration split, and timestamp order. The visit foreign key uses `ON DELETE
+RESTRICT`, so an issued financial record is not removed through a visit cascade.
+
 ### Driver API
 
 Public endpoints:
@@ -151,6 +158,9 @@ The remaining endpoints require `Authorization: Bearer <access-token>`:
 - `POST /api/barrier/exit`
 - `GET /api/visits/my`
 - `GET /api/visits/{id}/cost`
+- `GET /api/visits/{id}/invoice`
+- `GET /api/invoices/my`
+- `GET /api/invoices/{id}`
 
 JWT access tokens expire after 60 minutes. There is no refresh-token or logout
 API in the current stage.
@@ -216,11 +226,13 @@ lock is acquired. Because a walk-in exit time is unknown, spots with any live
 hold or confirmed future reservation are conservatively skipped. The same rule
 prevents walk-in entry when the vehicle itself has a future hold or booking.
 
-`POST /api/barrier/exit` completes the active visit using server time. A linked
-reservation changes from `CHECKED_IN` to `COMPLETED`. `GET /api/visits/my`
-returns active and completed visits, newest first, with actual duration for
-completed visits. Active visits make a spot `OCCUPIED` for both its current
-state and all future availability requests until physical exit.
+`POST /api/barrier/exit` completes the active visit using server time and issues
+its invoice in the same transaction. A linked reservation changes from
+`CHECKED_IN` to `COMPLETED`. The response retains the visit fields and also
+includes `invoiceId`, `invoiceNumber`, `totalAmount`, and `currency`.
+`GET /api/visits/my` returns active and completed visits, newest first, with
+actual duration for completed visits. Active visits make a spot `OCCUPIED` for
+both its current state and all future availability requests until physical exit.
 
 Example with an existing token and registered vehicle:
 
@@ -237,17 +249,18 @@ curl -sS -X POST 'http://localhost:8080/api/barrier/exit' \
   -d '{"plateNumber":"01KG123ABC"}'
 ```
 
-This stage does not create invoices, require payment for exit, expire no-show
-reservations automatically, send live WebSocket updates, or control physical
-barrier hardware.
+Exit does not require or simulate payment. Automatic no-show expiration, live
+WebSocket updates, and control of physical barrier hardware remain outside the
+current stage.
 
 ### Parking pricing
 
-`GET /api/visits/{id}/cost` calculates a detailed price only for a completed
-visit owned by the authenticated driver. Active visits return a conflict
-because their final duration is unknown; missing and foreign visits share the
-same not-found response. The calculation uses the persisted actual entry and
-exit instants for both reservation and walk-in visits.
+`GET /api/visits/{id}/cost` returns a detailed price only for a completed visit
+owned by the authenticated driver. Active visits return a conflict because
+their final duration is unknown; missing and foreign visits share the same
+not-found response. For a visit with an invoice, the response uses its saved
+historical values. A completed pre-V6 visit without an invoice retains the old
+current-tariff calculation behavior and is not presented as an issued invoice.
 
 Tariff selection always uses the configured parking zone, `Asia/Bishkek` by
 default, rather than the host system zone or the offsets originally used to
@@ -267,10 +280,35 @@ curl -sS "http://localhost:8080/api/visits/$VISIT_ID/cost" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Stage 07 calculates with the current configuration and does not persist a
-charge. Recalculating an old visit after a rate change can therefore produce a
-different result. A later invoice stage must snapshot the applied rates and
-amount; no tariff versioning, invoice, or payment state is introduced here.
+### Invoices and billing history
+
+Every new successful exit creates one `ISSUED` invoice. The invoice snapshots
+entry and exit time, vehicle plate, spot code, pricing zone, day/night seconds,
+both rates, high-precision cost components, the once-rounded authoritative
+`totalAmount`, and `KGS` currency. Later pricing configuration changes therefore
+cannot change an already issued amount. Visit completion and invoice insertion
+are atomic, while row locks and the unique `visit_id` constraint prevent a
+concurrent exit from creating a second charge.
+
+`GET /api/invoices/my` returns the authenticated driver's invoices newest
+first. `GET /api/invoices/{id}` and `GET /api/visits/{id}/invoice` return the
+saved invoice details; missing and foreign invoices are hidden with 404. An
+active visit or a completed pre-V6 visit without a snapshot returns a conflict,
+and GET requests never create financial records.
+
+```bash
+curl -sS 'http://localhost:8080/api/invoices/my' \
+  -H "Authorization: Bearer $TOKEN"
+curl -sS "http://localhost:8080/api/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+curl -sS "http://localhost:8080/api/visits/$VISIT_ID/invoice" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Invoices are a history of charges, not successful bank transactions. This
+stage has no payment acceptance, `PAID` state, PDF, email receipt, refund, or
+automatic backfill. Historical rates for visits completed before V6 were never
+stored, so the application deliberately does not invent invoices for them.
 
 ## Continuous Integration
 
@@ -285,12 +323,13 @@ container and its data are removed automatically when the job finishes. JWT
 secrets are generated for each workflow run and are not stored in the
 repository.
 
-The workflow assembles the Spring Boot JAR and runs 17 tagged smoke tests for
+The workflow assembles the Spring Boot JAR and runs 19 tagged smoke tests for
 application startup and Flyway, registration and login, JWT protection,
 vehicle creation and ownership, duplicate handling, parking spot listing, and
 availability validation, reservation lifecycle, concurrent hold protection,
 reservation entry/exit, concurrent walk-in allocation, and pricing across the
-day/night boundary. The check appears in a pull request as
+day/night boundary, automatic invoice issuance, and concurrent double-charge
+protection. The check appears in a pull request as
 `Backend CI / Build and Smoke Tests`. If the job fails, its Checks page contains
 the logs and a downloadable `backend-smoke-test-reports-*` artifact with the
 JUnit/Gradle reports, retained for seven days.

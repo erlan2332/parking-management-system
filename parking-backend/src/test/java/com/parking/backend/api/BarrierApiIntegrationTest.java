@@ -88,6 +88,10 @@ class BarrierApiIntegrationTest {
 				.andExpect(jsonPath("$.status").value("COMPLETED"))
 				.andExpect(jsonPath("$.exitedAt").isString())
 				.andExpect(jsonPath("$.durationSeconds").isNumber())
+				.andExpect(jsonPath("$.invoiceId").isNumber())
+				.andExpect(jsonPath("$.invoiceNumber").value(org.hamcrest.Matchers.startsWith("INV-")))
+				.andExpect(jsonPath("$.totalAmount").isNumber())
+				.andExpect(jsonPath("$.currency").value("KGS"))
 				.andReturn();
 		Number duration = JsonPath.read(exited.getResponse().getContentAsString(), "$.durationSeconds");
 		assertTrue(duration.longValue() >= 0);
