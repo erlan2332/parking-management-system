@@ -160,4 +160,18 @@ public class ReservationEntity {
 		status = ReservationStatus.CANCELLED;
 		this.cancelledAt = Objects.requireNonNull(cancelledAt, "Cancellation time must not be null");
 	}
+
+	public void checkIn() {
+		if (status != ReservationStatus.ACTIVE) {
+			throw new IllegalStateException("Only an active reservation can be checked in");
+		}
+		status = ReservationStatus.CHECKED_IN;
+	}
+
+	public void complete() {
+		if (status != ReservationStatus.CHECKED_IN) {
+			throw new IllegalStateException("Only a checked-in reservation can be completed");
+		}
+		status = ReservationStatus.COMPLETED;
+	}
 }

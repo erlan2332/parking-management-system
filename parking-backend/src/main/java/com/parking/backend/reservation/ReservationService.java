@@ -10,6 +10,7 @@ import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
+import com.parking.backend.visit.ParkingVisitRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,23 +34,28 @@ public class ReservationService {
 	);
 	private static final Set<ReservationStatus> CONFIRMED_HISTORY_STATUSES = Set.of(
 			ReservationStatus.ACTIVE,
-			ReservationStatus.CANCELLED
+			ReservationStatus.CANCELLED,
+			ReservationStatus.CHECKED_IN,
+			ReservationStatus.COMPLETED
 	);
 
 	private final ReservationRepository reservationRepository;
 	private final ParkingSpotRepository parkingSpotRepository;
 	private final VehicleRepository vehicleRepository;
+	private final ParkingVisitRepository parkingVisitRepository;
 	private final Clock clock;
 
 	public ReservationService(
 			ReservationRepository reservationRepository,
 			ParkingSpotRepository parkingSpotRepository,
 			VehicleRepository vehicleRepository,
+			ParkingVisitRepository parkingVisitRepository,
 			Clock clock
 	) {
 		this.reservationRepository = reservationRepository;
 		this.parkingSpotRepository = parkingSpotRepository;
 		this.vehicleRepository = vehicleRepository;
+		this.parkingVisitRepository = parkingVisitRepository;
 		this.clock = clock;
 	}
 
@@ -71,6 +77,9 @@ public class ReservationService {
 				.orElseThrow(() -> new ParkingSpotNotFoundException(spotId));
 		if (!spot.isActive()) {
 			throw new ReservationConflictException("Parking spot is unavailable");
+		}
+		if (parkingVisitRepository.existsBySpot_IdAndExitedAtIsNull(spotId)) {
+			throw new ReservationConflictException("Parking spot is physically occupied");
 		}
 
 		VehicleEntity vehicle = vehicleRepository.findOwnedByIdForUpdate(vehicleId, userId)

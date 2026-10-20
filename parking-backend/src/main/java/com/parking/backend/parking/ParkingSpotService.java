@@ -5,6 +5,8 @@ import com.parking.backend.common.exception.ParkingSpotNotFoundException;
 import com.parking.backend.reservation.ReservationEntity;
 import com.parking.backend.reservation.ReservationRepository;
 import com.parking.backend.reservation.ReservationStatus;
+import com.parking.backend.visit.ParkingVisitEntity;
+import com.parking.backend.visit.ParkingVisitRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +30,18 @@ public class ParkingSpotService {
 
 	private final ParkingSpotRepository parkingSpotRepository;
 	private final ReservationRepository reservationRepository;
+	private final ParkingVisitRepository parkingVisitRepository;
 	private final Clock clock;
 
 	public ParkingSpotService(
 			ParkingSpotRepository parkingSpotRepository,
 			ReservationRepository reservationRepository,
+			ParkingVisitRepository parkingVisitRepository,
 			Clock clock
 	) {
 		this.parkingSpotRepository = parkingSpotRepository;
 		this.reservationRepository = reservationRepository;
+		this.parkingVisitRepository = parkingVisitRepository;
 		this.clock = clock;
 	}
 
@@ -60,8 +65,13 @@ public class ParkingSpotService {
 		Instant now = clock.instant();
 		List<ParkingSpotEntity> spots = parkingSpotRepository.findAllInNaturalCodeOrder();
 		Map<Long, List<ReservationEntity>> blockersBySpot = blockersBySpot(now, now.plusNanos(1), now);
+		Set<Long> occupiedSpotIds = occupiedSpotIds();
 		return spots.stream()
-				.map(spot -> toState(spot, blockersBySpot.getOrDefault(spot.getId(), List.of())))
+				.map(spot -> toState(
+						spot,
+						blockersBySpot.getOrDefault(spot.getId(), List.of()),
+						isOccupied(spot, occupiedSpotIds)
+				))
 				.toList();
 	}
 
@@ -70,7 +80,11 @@ public class ParkingSpotService {
 		ParkingSpotEntity spot = getSpotById(id);
 		Instant now = clock.instant();
 		Map<Long, List<ReservationEntity>> blockersBySpot = blockersBySpot(now, now.plusNanos(1), now);
-		return toState(spot, blockersBySpot.getOrDefault(spot.getId(), List.of()));
+		return toState(
+				spot,
+				blockersBySpot.getOrDefault(spot.getId(), List.of()),
+				isOccupied(spot, occupiedSpotIds())
+		);
 	}
 
 	@Transactional(readOnly = true)
@@ -80,11 +94,13 @@ public class ParkingSpotService {
 		Instant end = endAt.toInstant();
 		Instant now = clock.instant();
 		Map<Long, List<ReservationEntity>> blockersBySpot = blockersBySpot(start, end, now);
+		Set<Long> occupiedSpotIds = occupiedSpotIds();
 		return parkingSpotRepository.findAllInNaturalCodeOrder().stream()
 				.map(spot -> {
 					ParkingSpotStatus status = statusFor(
 							spot,
-							blockersBySpot.getOrDefault(spot.getId(), List.of())
+							blockersBySpot.getOrDefault(spot.getId(), List.of()),
+							isOccupied(spot, occupiedSpotIds)
 					);
 					return new ParkingSpotAvailability(
 							spot.getId(),
@@ -108,17 +124,22 @@ public class ParkingSpotService {
 
 	private static ParkingSpotState toState(
 			ParkingSpotEntity spot,
-			Collection<ReservationEntity> blockers
+			Collection<ReservationEntity> blockers,
+			boolean occupied
 	) {
-		return new ParkingSpotState(spot.getId(), spot.getCode(), spot.isActive(), statusFor(spot, blockers));
+		return new ParkingSpotState(spot.getId(), spot.getCode(), spot.isActive(), statusFor(spot, blockers, occupied));
 	}
 
 	private static ParkingSpotStatus statusFor(
 			ParkingSpotEntity spot,
-			Collection<ReservationEntity> blockers
+			Collection<ReservationEntity> blockers,
+			boolean occupied
 	) {
 		if (!spot.isActive()) {
 			return ParkingSpotStatus.UNAVAILABLE;
+		}
+		if (occupied) {
+			return ParkingSpotStatus.OCCUPIED;
 		}
 
 		EnumSet<ReservationStatus> statuses = blockers.stream()
@@ -134,6 +155,17 @@ public class ParkingSpotService {
 			return ParkingSpotStatus.HELD;
 		}
 		return ParkingSpotStatus.FREE;
+	}
+
+	private Set<Long> occupiedSpotIds() {
+		return parkingVisitRepository.findAllByExitedAtIsNull().stream()
+				.map(ParkingVisitEntity::getSpot)
+				.map(ParkingSpotEntity::getId)
+				.collect(Collectors.toUnmodifiableSet());
+	}
+
+	private static boolean isOccupied(ParkingSpotEntity spot, Set<Long> occupiedSpotIds) {
+		return spot.getId() != null && occupiedSpotIds.contains(spot.getId());
 	}
 
 	private static void validateInterval(OffsetDateTime startAt, OffsetDateTime endAt) {
