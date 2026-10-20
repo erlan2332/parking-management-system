@@ -6,7 +6,10 @@ import com.parking.backend.common.exception.InvalidCredentialsException;
 import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.InvalidPasswordException;
 import com.parking.backend.common.exception.InvalidPlateNumberException;
+import com.parking.backend.common.exception.InvalidReservationRequestException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
+import com.parking.backend.common.exception.ReservationConflictException;
+import com.parking.backend.common.exception.ReservationNotFoundException;
 import com.parking.backend.common.exception.UserNotFoundException;
 import com.parking.backend.common.exception.VehicleNotFoundException;
 import org.slf4j.Logger;
@@ -64,6 +67,16 @@ public class GlobalExceptionHandler {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_PARKING_INTERVAL", exception.getMessage());
 	}
 
+	@ExceptionHandler(InvalidReservationRequestException.class)
+	ResponseEntity<ApiErrorResponse> handleInvalidReservationRequest(InvalidReservationRequestException exception) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_RESERVATION_REQUEST", exception.getMessage());
+	}
+
+	@ExceptionHandler(ReservationConflictException.class)
+	ResponseEntity<ApiErrorResponse> handleReservationConflict(ReservationConflictException exception) {
+		return error(HttpStatus.CONFLICT, "RESERVATION_CONFLICT", exception.getMessage());
+	}
+
 	@ExceptionHandler(InvalidPlateNumberException.class)
 	ResponseEntity<ApiErrorResponse> handleInvalidPlate(InvalidPlateNumberException exception) {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_PLATE_NUMBER", exception.getMessage());
@@ -102,6 +115,11 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ParkingSpotNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> handleParkingSpotNotFound() {
 		return error(HttpStatus.NOT_FOUND, "PARKING_SPOT_NOT_FOUND", "Parking spot was not found");
+	}
+
+	@ExceptionHandler(ReservationNotFoundException.class)
+	ResponseEntity<ApiErrorResponse> handleReservationNotFound() {
+		return error(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", "Reservation was not found");
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)

@@ -2,13 +2,18 @@ package com.parking.backend.parking;
 
 import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
+import com.parking.backend.reservation.ReservationRepository;
+import com.parking.backend.reservation.ReservationStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,18 +25,24 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class ParkingSpotServiceTest {
 
 	@Mock
 	private ParkingSpotRepository parkingSpotRepository;
+	@Mock
+	private ReservationRepository reservationRepository;
 
 	private ParkingSpotService parkingSpotService;
 
 	@BeforeEach
 	void setUp() {
-		parkingSpotService = new ParkingSpotService(parkingSpotRepository);
+		Clock clock = Clock.fixed(Instant.parse("2026-12-01T08:00:00Z"), ZoneOffset.UTC);
+		parkingSpotService = new ParkingSpotService(parkingSpotRepository, reservationRepository, clock);
 	}
 
 	@Test
@@ -59,6 +70,7 @@ class ParkingSpotServiceTest {
 	void acceptsIntervalWhenStartIsEarlierThanEnd() {
 		when(parkingSpotRepository.findAllInNaturalCodeOrder())
 				.thenReturn(List.of(new ParkingSpotEntity("A1", true)));
+		stubNoBlockingReservations();
 
 		List<ParkingSpotAvailability> result = parkingSpotService.getAvailability(
 				OffsetDateTime.parse("2026-12-01T14:00:00+06:00"),
@@ -78,6 +90,7 @@ class ParkingSpotServiceTest {
 				() -> parkingSpotService.getAvailability(boundary, boundary)
 		);
 		verifyNoInteractions(parkingSpotRepository);
+		verifyNoInteractions(reservationRepository);
 	}
 
 	@Test
@@ -90,11 +103,13 @@ class ParkingSpotServiceTest {
 				)
 		);
 		verifyNoInteractions(parkingSpotRepository);
+		verifyNoInteractions(reservationRepository);
 	}
 
 	@Test
 	void comparesIntervalsByInstantAcrossDifferentOffsets() {
 		when(parkingSpotRepository.findAllInNaturalCodeOrder()).thenReturn(List.of());
+		stubNoBlockingReservations();
 
 		parkingSpotService.getAvailability(
 				OffsetDateTime.parse("2026-12-01T14:00:00+06:00"),
@@ -116,5 +131,15 @@ class ParkingSpotServiceTest {
 		assertFalse(spot.isActive());
 		verify(parkingSpotRepository).findAllInNaturalCodeOrder();
 		verifyNoMoreInteractions(parkingSpotRepository);
+	}
+
+	private void stubNoBlockingReservations() {
+		when(reservationRepository.findBlockingForInterval(
+				any(),
+				any(),
+				any(),
+				eq(ReservationStatus.HELD),
+				anyCollection()
+		)).thenReturn(List.of());
 	}
 }

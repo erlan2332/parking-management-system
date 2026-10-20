@@ -24,15 +24,14 @@ public class ParkingSpotController {
 
 	@GetMapping("/spots")
 	public List<ParkingSpotResponse> getSpots() {
-		return parkingSpotService.getAllSpots().stream()
-				.map(spot -> ParkingSpotResponse.from(spot, parkingSpotService.determineStatus(spot)))
+		return parkingSpotService.getCurrentSpotStates().stream()
+				.map(ParkingSpotResponse::from)
 				.toList();
 	}
 
 	@GetMapping("/spots/{id}")
 	public ParkingSpotResponse getSpot(@PathVariable Long id) {
-		ParkingSpotEntity spot = parkingSpotService.getSpotById(id);
-		return ParkingSpotResponse.from(spot, parkingSpotService.determineStatus(spot));
+		return ParkingSpotResponse.from(parkingSpotService.getCurrentSpotState(id));
 	}
 
 	@GetMapping("/availability")
