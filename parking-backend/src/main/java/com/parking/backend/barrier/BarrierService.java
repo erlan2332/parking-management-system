@@ -11,6 +11,8 @@ import com.parking.backend.invoice.InvoiceEntity;
 import com.parking.backend.invoice.InvoiceService;
 import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
+import com.parking.backend.realtime.ParkingChangePublisher;
+import com.parking.backend.realtime.ParkingChangeReason;
 import com.parking.backend.reservation.ReservationEntity;
 import com.parking.backend.reservation.ReservationEntryPolicy;
 import com.parking.backend.reservation.ReservationEntryTarget;
@@ -48,6 +50,7 @@ public class BarrierService {
 	private final ParkingVisitRepository parkingVisitRepository;
 	private final InvoiceService invoiceService;
 	private final ReservationEntryPolicy entryPolicy;
+	private final ParkingChangePublisher changePublisher;
 	private final Clock clock;
 
 	public BarrierService(
@@ -58,6 +61,7 @@ public class BarrierService {
 			ParkingVisitRepository parkingVisitRepository,
 			InvoiceService invoiceService,
 			ReservationEntryPolicy entryPolicy,
+			ParkingChangePublisher changePublisher,
 			Clock clock
 	) {
 		this.plateNormalizer = plateNormalizer;
@@ -67,6 +71,7 @@ public class BarrierService {
 		this.parkingVisitRepository = parkingVisitRepository;
 		this.invoiceService = invoiceService;
 		this.entryPolicy = entryPolicy;
+		this.changePublisher = changePublisher;
 		this.clock = clock;
 	}
 
@@ -149,6 +154,11 @@ public class BarrierService {
 			lockedReservation.complete();
 		}
 		InvoiceEntity invoice = invoiceService.issueForVisit(lockedVisit, exitedAt);
+		changePublisher.publish(
+				ParkingChangeReason.VEHICLE_EXITED,
+				lockedVisit.getSpot().getId(),
+				lockedVisit.getSpot().getCode()
+		);
 		return new BarrierExitResult(lockedVisit, invoice);
 	}
 
@@ -177,6 +187,11 @@ public class BarrierService {
 		if (reservation.getStatus() == ReservationStatus.ACTIVE
 				&& entryPolicy.isExpiredAt(reservation.getStartAt(), reservation.getEndAt(), enteredAt)) {
 			reservation.expireNoShow();
+			changePublisher.publish(
+					ParkingChangeReason.RESERVATION_EXPIRED,
+					reservation.getSpot().getId(),
+					reservation.getSpot().getCode()
+			);
 			throw new ReservationNoShowExpiredException();
 		}
 		if (reservation.getStatus() != ReservationStatus.ACTIVE
@@ -268,13 +283,24 @@ public class BarrierService {
 		if (reservation.getStatus() == ReservationStatus.ACTIVE
 				&& entryPolicy.isExpiredAt(reservation.getStartAt(), reservation.getEndAt(), now)) {
 			reservation.expireNoShow();
+			changePublisher.publish(
+					ParkingChangeReason.RESERVATION_EXPIRED,
+					reservation.getSpot().getId(),
+					reservation.getSpot().getCode()
+			);
 		}
 		throw new ReservationNoShowExpiredException();
 	}
 
 	private ParkingVisitEntity saveVisit(ParkingVisitEntity visit) {
 		try {
-			return parkingVisitRepository.saveAndFlush(visit);
+			ParkingVisitEntity savedVisit = parkingVisitRepository.saveAndFlush(visit);
+			changePublisher.publish(
+					ParkingChangeReason.VEHICLE_ENTERED,
+					savedVisit.getSpot().getId(),
+					savedVisit.getSpot().getCode()
+			);
+			return savedVisit;
 		} catch (DataIntegrityViolationException exception) {
 			if (DatabaseConstraintViolationDetector.hasConstraint(exception, ACTIVE_VEHICLE_CONSTRAINT)) {
 				throw new VehicleAlreadyParkedException(exception);

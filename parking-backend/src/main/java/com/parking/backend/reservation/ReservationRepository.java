@@ -4,7 +4,6 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -170,10 +169,9 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
 	);
 
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query(value = """
-			UPDATE reservations reservation
-			SET status = 'EXPIRED'
+			SELECT reservation.id
+			FROM reservations reservation
 			WHERE status = 'ACTIVE'
 			  AND (end_at <= :now OR start_at <= :activeStartCutoff)
 			  AND (spot_id = :spotId OR vehicle_id = :vehicleId)
@@ -182,47 +180,40 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			      FROM parking_visits visit
 			      WHERE visit.reservation_id = reservation.id
 			  )
+			ORDER BY reservation.id
+			FOR UPDATE
 			""", nativeQuery = true)
-	int expireConflictingNoShows(
+	List<Long> findConflictingNoShowIdsForUpdate(
 			@Param("spotId") Long spotId,
 			@Param("vehicleId") Long vehicleId,
 			@Param("now") Instant now,
 			@Param("activeStartCutoff") Instant activeStartCutoff
 	);
 
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query(value = """
-			WITH due AS (
-			    SELECT id
-			    FROM reservations
-			    WHERE status = 'ACTIVE'
-			      AND (end_at <= :now OR start_at <= :activeStartCutoff)
-			      AND NOT EXISTS (
-			          SELECT 1
-			          FROM parking_visits visit
-			          WHERE visit.reservation_id = reservations.id
-			      )
-			    ORDER BY id
-			    LIMIT :batchSize
-			    FOR UPDATE SKIP LOCKED
+			SELECT reservation.id
+			FROM reservations reservation
+			WHERE reservation.status = 'ACTIVE'
+			  AND (reservation.end_at <= :now OR reservation.start_at <= :activeStartCutoff)
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM parking_visits visit
+			      WHERE visit.reservation_id = reservation.id
 			)
-			UPDATE reservations reservation
-			SET status = 'EXPIRED'
-			FROM due
-			WHERE reservation.id = due.id
-			  AND reservation.status = 'ACTIVE'
+			ORDER BY reservation.id
+			LIMIT :batchSize
+			FOR UPDATE SKIP LOCKED
 			""", nativeQuery = true)
-	int expireDueNoShows(
+	List<Long> findDueNoShowIdsForUpdate(
 			@Param("now") Instant now,
 			@Param("activeStartCutoff") Instant activeStartCutoff,
 			@Param("batchSize") int batchSize
 	);
 
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query(value = """
-			UPDATE reservations reservation
-			SET status = 'EXPIRED'
-			WHERE user_id = :userId
+			SELECT reservation.id
+			FROM reservations reservation
+			WHERE reservation.user_id = :userId
 			  AND status = 'ACTIVE'
 			  AND (end_at <= :now OR start_at <= :activeStartCutoff)
 			  AND NOT EXISTS (
@@ -230,24 +221,27 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			      FROM parking_visits visit
 			      WHERE visit.reservation_id = reservation.id
 			  )
+			ORDER BY reservation.id
+			FOR UPDATE
 			""", nativeQuery = true)
-	int expireNoShowsForUser(
+	List<Long> findNoShowIdsForUserForUpdate(
 			@Param("userId") Long userId,
 			@Param("now") Instant now,
 			@Param("activeStartCutoff") Instant activeStartCutoff
 	);
 
-	@Modifying(flushAutomatically = true)
 	@Query(value = """
-			UPDATE reservations
-			SET status = 'HOLD_EXPIRED'
-			WHERE status = 'HELD'
-			  AND hold_expires_at <= :now
-			  AND start_at < :endAt
-			  AND end_at > :startAt
-			  AND (spot_id = :spotId OR vehicle_id = :vehicleId)
+			SELECT reservation.id
+			FROM reservations reservation
+			WHERE reservation.status = 'HELD'
+			  AND reservation.hold_expires_at <= :now
+			  AND reservation.start_at < :endAt
+			  AND reservation.end_at > :startAt
+			  AND (reservation.spot_id = :spotId OR reservation.vehicle_id = :vehicleId)
+			ORDER BY reservation.id
+			FOR UPDATE
 			""", nativeQuery = true)
-	int expireConflictingHolds(
+	List<Long> findConflictingHoldIdsForUpdate(
 			@Param("spotId") Long spotId,
 			@Param("vehicleId") Long vehicleId,
 			@Param("startAt") Instant startAt,
@@ -255,21 +249,31 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			@Param("now") Instant now
 	);
 
-	@Modifying(flushAutomatically = true)
 	@Query(value = """
-			UPDATE reservations
-			SET status = 'HOLD_EXPIRED'
-			WHERE status = 'HELD' AND hold_expires_at <= :now
+			SELECT reservation.id
+			FROM reservations reservation
+			WHERE reservation.status = 'HELD'
+			  AND reservation.hold_expires_at <= :now
+			ORDER BY reservation.id
+			LIMIT :batchSize
+			FOR UPDATE SKIP LOCKED
 			""", nativeQuery = true)
-	int expireAllHolds(@Param("now") Instant now);
+	List<Long> findDueHoldIdsForUpdate(
+			@Param("now") Instant now,
+			@Param("batchSize") int batchSize
+	);
 
-	@Modifying(flushAutomatically = true)
 	@Query(value = """
-			UPDATE reservations
-			SET status = 'HOLD_EXPIRED'
-			WHERE user_id = :userId
-			  AND status = 'HELD'
-			  AND hold_expires_at <= :now
+			SELECT reservation.id
+			FROM reservations reservation
+			WHERE reservation.user_id = :userId
+			  AND reservation.status = 'HELD'
+			  AND reservation.hold_expires_at <= :now
+			ORDER BY reservation.id
+			FOR UPDATE
 			""", nativeQuery = true)
-	int expireHoldsForUser(@Param("userId") Long userId, @Param("now") Instant now);
+	List<Long> findHoldIdsForUserForUpdate(
+			@Param("userId") Long userId,
+			@Param("now") Instant now
+	);
 }
