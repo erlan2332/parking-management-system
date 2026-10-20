@@ -78,3 +78,18 @@
   checks can be added there in later stages without changing the API shape.
 - Added unit, PostgreSQL-backed persistence/Flyway, and secured MockMvc tests,
   while retaining the existing uniform API error format.
+
+## CI-01 — Backend Smoke Tests
+
+- Added one GitHub Actions job for pull requests to `dev-parking` and pushes
+  after merge. It uses Temurin Java 21, the project Gradle Wrapper, and Gradle
+  dependency caching without adding a build matrix or deployment steps.
+- Chose an ephemeral PostgreSQL 17 service container with a health check so CI
+  exercises the same Flyway migrations, Hibernate validation, constraints, and
+  SQL behavior as local integration tests instead of substituting H2.
+- Added a dedicated `smokeTest` Gradle task that selects 12 existing critical
+  scenarios with the JUnit `smoke` tag and fails when no tests are discovered.
+  The standard `test` and `build` tasks still run the complete suite.
+- Kept CI intentionally lightweight: it assembles the Spring Boot JAR, checks
+  authentication, authorization, vehicles, parking spots, and availability,
+  and uploads only test reports when a failure occurs.

@@ -7,6 +7,7 @@ import com.parking.backend.user.UserRepository;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
 import com.parking.backend.vehicle.VehicleService;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -75,6 +76,7 @@ class DriverApiIntegrationTest {
 	private JwtDecoder jwtDecoder;
 
 	@Test
+	@Tag("smoke")
 	void registersUserWithNormalizedEmailAndPasswordHash() throws Exception {
 		mockMvc.perform(post("/api/auth/register")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -93,6 +95,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void rejectsCaseInsensitiveDuplicateEmail() throws Exception {
 		createUser("driver@example.com", PASSWORD);
 
@@ -120,6 +123,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void logsInAndReturnsVerifiableOneHourJwt() throws Exception {
 		UserEntity user = createUser("driver@example.com", PASSWORD);
 
@@ -142,6 +146,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void returnsSameUnauthorizedResponseForWrongPasswordAndMissingUser() throws Exception {
 		createUser("driver@example.com", PASSWORD);
 
@@ -194,6 +199,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void rejectsProtectedEndpointsWithoutJwt() throws Exception {
 		mockMvc.perform(get("/api/users/me"))
 				.andExpect(status().isUnauthorized())
@@ -267,6 +273,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void createsNormalizedVehicleForCurrentUser() throws Exception {
 		UserEntity user = createUser("vehicle-owner@example.com", PASSWORD);
 
@@ -310,6 +317,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void hidesVehicleOwnedByAnotherUser() throws Exception {
 		UserEntity currentUser = createUser("get-current@example.com", PASSWORD);
 		UserEntity anotherUser = createUser("get-other@example.com", PASSWORD);
@@ -322,6 +330,7 @@ class DriverApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void rejectsDuplicateVehiclePlate() throws Exception {
 		UserEntity firstUser = createUser("duplicate-first@example.com", PASSWORD);
 		UserEntity secondUser = createUser("duplicate-second@example.com", PASSWORD);

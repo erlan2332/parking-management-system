@@ -3,6 +3,7 @@ package com.parking.backend.api;
 import com.parking.backend.parking.ParkingSpotController;
 import com.parking.backend.parking.dto.ParkingSpotResponse;
 import com.parking.backend.security.JwtService;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +35,7 @@ class ParkingSpotApiIntegrationTest {
 	private JdbcTemplate jdbcTemplate;
 
 	@Test
+	@Tag("smoke")
 	void returnsAllSpotsWithJwtInNaturalOrder() throws Exception {
 		mockMvc.perform(get("/api/parking/spots").header("Authorization", bearerToken()))
 				.andExpect(status().isOk())
@@ -74,6 +76,7 @@ class ParkingSpotApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void returnsAvailabilityForValidInterval() throws Exception {
 		mockMvc.perform(validAvailabilityRequest())
 				.andExpect(status().isOk())
@@ -95,6 +98,7 @@ class ParkingSpotApiIntegrationTest {
 	}
 
 	@Test
+	@Tag("smoke")
 	void rejectsInvalidInterval() throws Exception {
 		mockMvc.perform(get("/api/parking/availability")
 						.header("Authorization", bearerToken())
