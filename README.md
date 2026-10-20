@@ -120,3 +120,43 @@ The remaining endpoints require `Authorization: Bearer <access-token>`:
 
 JWT access tokens expire after 60 minutes. There is no refresh-token or logout
 API in the current stage.
+
+## Continuous Integration
+
+The backend workflow is defined in `.github/workflows/backend-ci.yml`. It runs
+for every pull request targeting `dev-parking`, for new commits added to such a
+pull request, and after changes are pushed to `dev-parking`.
+
+GitHub Actions starts an ephemeral PostgreSQL 17 Docker service with a health
+check. The service creates an isolated CI user and database, then Flyway applies
+the real PostgreSQL migrations before Hibernate validates the mappings. The
+container and its data are removed automatically when the job finishes. JWT
+secrets are generated for each workflow run and are not stored in the
+repository.
+
+The workflow assembles the Spring Boot JAR and runs 12 tagged smoke tests for
+application startup and Flyway, registration and login, JWT protection,
+vehicle creation and ownership, duplicate handling, parking spot listing, and
+availability validation. The check appears in a pull request as
+`Backend CI / Build and Smoke Tests`. If the job fails, its Checks page contains
+the logs and a downloadable `backend-smoke-test-reports-*` artifact with the
+JUnit/Gradle reports, retained for seven days.
+
+Smoke Tests are the fast critical-path subset used by GitHub on each pull
+request. Run them locally against a dedicated PostgreSQL test database with:
+
+```bash
+cd parking-backend
+./gradlew --no-daemon clean assemble smokeTest
+```
+
+Full Tests remain the complete local regression suite, including all existing
+unit and integration tests:
+
+```bash
+cd parking-backend
+./gradlew clean build
+```
+
+A successful Smoke CI run confirms only the selected critical scenarios; it
+does not mean that the full test suite has been executed.
