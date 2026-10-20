@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 public record ParkingCostBreakdown(
 		String currency,
+		String pricingZoneId,
 		long totalDurationSeconds,
 		long dayDurationSeconds,
 		long nightDurationSeconds,

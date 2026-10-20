@@ -7,6 +7,9 @@ import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.InvalidPasswordException;
 import com.parking.backend.common.exception.InvalidPlateNumberException;
 import com.parking.backend.common.exception.InvalidReservationRequestException;
+import com.parking.backend.common.exception.InvoiceAlreadyIssuedException;
+import com.parking.backend.common.exception.InvoiceNotFoundException;
+import com.parking.backend.common.exception.InvoiceNotIssuedException;
 import com.parking.backend.common.exception.NoActiveVisitException;
 import com.parking.backend.common.exception.NoAvailableParkingSpotException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
@@ -108,6 +111,16 @@ public class GlobalExceptionHandler {
 		return error(HttpStatus.CONFLICT, "PARKING_VISIT_NOT_COMPLETED", exception.getMessage());
 	}
 
+	@ExceptionHandler(InvoiceAlreadyIssuedException.class)
+	ResponseEntity<ApiErrorResponse> handleInvoiceAlreadyIssued(InvoiceAlreadyIssuedException exception) {
+		return error(HttpStatus.CONFLICT, "INVOICE_ALREADY_ISSUED", exception.getMessage());
+	}
+
+	@ExceptionHandler(InvoiceNotIssuedException.class)
+	ResponseEntity<ApiErrorResponse> handleInvoiceNotIssued(InvoiceNotIssuedException exception) {
+		return error(HttpStatus.CONFLICT, "INVOICE_NOT_ISSUED", exception.getMessage());
+	}
+
 	@ExceptionHandler(InvalidPlateNumberException.class)
 	ResponseEntity<ApiErrorResponse> handleInvalidPlate(InvalidPlateNumberException exception) {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_PLATE_NUMBER", exception.getMessage());
@@ -151,6 +164,11 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ParkingVisitNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> handleParkingVisitNotFound() {
 		return error(HttpStatus.NOT_FOUND, "PARKING_VISIT_NOT_FOUND", "Parking visit was not found");
+	}
+
+	@ExceptionHandler(InvoiceNotFoundException.class)
+	ResponseEntity<ApiErrorResponse> handleInvoiceNotFound() {
+		return error(HttpStatus.NOT_FOUND, "INVOICE_NOT_FOUND", "Invoice was not found");
 	}
 
 	@ExceptionHandler(ReservationNotFoundException.class)
