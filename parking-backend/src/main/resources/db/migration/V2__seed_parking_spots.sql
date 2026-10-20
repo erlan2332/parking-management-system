@@ -1,0 +1,22 @@
+INSERT INTO parking_spots (code, active)
+VALUES ('A1', TRUE),
+       ('A2', TRUE),
+       ('A3', TRUE),
+       ('A4', TRUE),
+       ('A5', TRUE),
+       ('A6', TRUE),
+       ('A7', TRUE),
+       ('A8', TRUE),
+       ('A9', TRUE),
+       ('A10', TRUE),
+       ('B1', TRUE),
+       ('B2', TRUE),
+       ('B3', TRUE),
+       ('B4', TRUE),
+       ('B5', TRUE),
+       ('B6', TRUE),
+       ('B7', TRUE),
+       ('B8', TRUE),
+       ('B9', TRUE),
+       ('B10', TRUE)
+ON CONFLICT (code) DO NOTHING;
