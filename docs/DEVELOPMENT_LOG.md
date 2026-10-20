@@ -93,3 +93,32 @@
 - Kept CI intentionally lightweight: it assembles the Spring Boot JAR, checks
   authentication, authorization, vehicles, parking spots, and availability,
   and uploads only test reports when a failure occurs.
+
+## Stage 05 — Timed Holds and Reservations
+
+- Chose one `reservations` table for temporary holds and confirmed bookings so
+  confirmation changes one row from `HELD` to `ACTIVE` without a release gap or
+  a second insert. Historical terminal states stay in the same table.
+- Added PostgreSQL `btree_gist` exclusion constraints over half-open
+  `tstzrange(start_at, end_at, '[)')` values. Separate constraints make the
+  database authoritative against overlapping active intervals for both a spot
+  and a vehicle, including requests that race between Java pre-checks.
+- Standardized hold creation lock order as parking spot followed by vehicle.
+  Before conflict checks, the transaction marks matching overdue holds as
+  `HOLD_EXPIRED`; therefore a newly available interval can be acquired even if
+  scheduled cleanup has not run yet.
+- Kept time server-owned through an injected `Clock`. A deadline is the earlier
+  of three minutes after creation and the requested start, is persisted in
+  PostgreSQL, and cannot be supplied or extended by the client. Confirmation at
+  the deadline or after the interval begins is rejected.
+- Added a 20-second scheduled bulk cleanup that changes only overdue `HELD`
+  rows. Repeated cleanup is safe and cannot expire `ACTIVE` reservations.
+- Extended availability with `HELD` and `RESERVED` while retaining interval
+  semantics. Blockers are loaded in one query for all spots, and future holds
+  do not alter the current-instant spot list.
+- Added owner-scoped secured hold, confirmation, release, history, and
+  cancellation endpoints. Repeated confirmation, release, and cancellation of
+  the already reached successful state are idempotent.
+- Added focused unit, PostgreSQL integration, secured MockMvc, controlled-clock,
+  and real concurrent-transaction tests. WebSocket broadcasting remains a
+  later-stage concern; clients currently refresh state through REST.
