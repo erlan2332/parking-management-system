@@ -1,6 +1,7 @@
 package com.parking.backend.parking.dto;
 
 import com.parking.backend.parking.ParkingSpotAvailability;
+import com.parking.backend.parking.ParkingSpotStatus;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -30,11 +31,12 @@ public record ParkingAvailabilityResponse(
 	public record SpotAvailabilityResponse(
 			Long id,
 			String code,
-			boolean available
+			boolean available,
+			ParkingSpotStatus status
 	) {
 
 		private static SpotAvailabilityResponse from(ParkingSpotAvailability spot) {
-			return new SpotAvailabilityResponse(spot.id(), spot.code(), spot.available());
+			return new SpotAvailabilityResponse(spot.id(), spot.code(), spot.available(), spot.status());
 		}
 	}
 }
