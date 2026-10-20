@@ -39,7 +39,12 @@ public interface ParkingSpotRepository extends JpaRepository<ParkingSpotEntity, 
 			      FROM reservations reservation
 			      WHERE reservation.spot_id = spot.id
 			        AND (
-			            reservation.status IN ('ACTIVE', 'CHECKED_IN')
+			            reservation.status = 'CHECKED_IN'
+			            OR (
+			                reservation.status = 'ACTIVE'
+			                AND reservation.end_at > :now
+			                AND reservation.start_at > :activeStartCutoff
+			            )
 			            OR (
 			                reservation.status = 'HELD'
 			                AND reservation.hold_expires_at > :now
@@ -50,5 +55,8 @@ public interface ParkingSpotRepository extends JpaRepository<ParkingSpotEntity, 
 			         CAST(substring(spot.code FROM '[0-9]+$') AS INTEGER),
 			         spot.code
 			""", nativeQuery = true)
-	List<Long> findWalkInCandidateIds(@Param("now") Instant now);
+	List<Long> findWalkInCandidateIds(
+			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff
+	);
 }

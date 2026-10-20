@@ -40,18 +40,56 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 	);
 
 	@Query("""
+			SELECT new com.parking.backend.reservation.ReservationEntryTarget(
+			    reservation.id,
+			    reservation.spot.id,
+			    reservation.startAt,
+			    reservation.endAt
+			)
+			FROM ReservationEntity reservation
+			WHERE reservation.vehicle.id = :vehicleId
+			  AND reservation.status = :activeStatus
+			ORDER BY reservation.startAt ASC, reservation.id ASC
+			""")
+	List<ReservationEntryTarget> findActiveEntryTargetsByVehicleId(
+			@Param("vehicleId") Long vehicleId,
+			@Param("activeStatus") ReservationStatus activeStatus
+	);
+
+	@Query("""
+			SELECT CASE WHEN COUNT(reservation) > 0 THEN true ELSE false END
+			FROM ReservationEntity reservation
+			WHERE reservation.vehicle.id = :vehicleId
+			  AND reservation.status = :expiredStatus
+			  AND reservation.startAt <= :now
+			  AND reservation.endAt > :now
+			""")
+	boolean existsCurrentNoShowForVehicle(
+			@Param("vehicleId") Long vehicleId,
+			@Param("expiredStatus") ReservationStatus expiredStatus,
+			@Param("now") Instant now
+	);
+
+	@Query("""
 			SELECT CASE WHEN COUNT(reservation) > 0 THEN true ELSE false END
 			FROM ReservationEntity reservation
 			WHERE reservation.vehicle.id = :vehicleId
 			  AND (
 			      reservation.status IN :persistentStatuses
+			      OR (
+			          reservation.status = :activeStatus
+			          AND reservation.endAt > :now
+			          AND reservation.startAt > :activeStartCutoff
+			      )
 			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
 			  )
 			""")
 	boolean existsBlockingObligationForVehicle(
 			@Param("vehicleId") Long vehicleId,
 			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff,
 			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("activeStatus") ReservationStatus activeStatus,
 			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
 	);
 
@@ -61,13 +99,20 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			WHERE reservation.spot.id = :spotId
 			  AND (
 			      reservation.status IN :persistentStatuses
+			      OR (
+			          reservation.status = :activeStatus
+			          AND reservation.endAt > :now
+			          AND reservation.startAt > :activeStartCutoff
+			      )
 			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
 			  )
 			""")
 	boolean existsBlockingObligationForSpot(
 			@Param("spotId") Long spotId,
 			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff,
 			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("activeStatus") ReservationStatus activeStatus,
 			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
 	);
 
@@ -79,6 +124,11 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			  AND reservation.endAt > :startAt
 			  AND (
 			      reservation.status IN :persistentStatuses
+			      OR (
+			          reservation.status = :activeStatus
+			          AND reservation.endAt > :now
+			          AND reservation.startAt > :activeStartCutoff
+			      )
 			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
 			  )
 			""")
@@ -88,7 +138,9 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			@Param("startAt") Instant startAt,
 			@Param("endAt") Instant endAt,
 			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff,
 			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("activeStatus") ReservationStatus activeStatus,
 			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
 	);
 
@@ -99,6 +151,11 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			  AND reservation.endAt > :startAt
 			  AND (
 			      reservation.status IN :persistentStatuses
+			      OR (
+			          reservation.status = :activeStatus
+			          AND reservation.endAt > :now
+			          AND reservation.startAt > :activeStartCutoff
+			      )
 			      OR (reservation.status = :heldStatus AND reservation.holdExpiresAt > :now)
 			  )
 			""")
@@ -107,8 +164,77 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			@Param("startAt") Instant startAt,
 			@Param("endAt") Instant endAt,
 			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff,
 			@Param("heldStatus") ReservationStatus heldStatus,
+			@Param("activeStatus") ReservationStatus activeStatus,
 			@Param("persistentStatuses") Collection<ReservationStatus> persistentStatuses
+	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query(value = """
+			UPDATE reservations reservation
+			SET status = 'EXPIRED'
+			WHERE status = 'ACTIVE'
+			  AND (end_at <= :now OR start_at <= :activeStartCutoff)
+			  AND (spot_id = :spotId OR vehicle_id = :vehicleId)
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM parking_visits visit
+			      WHERE visit.reservation_id = reservation.id
+			  )
+			""", nativeQuery = true)
+	int expireConflictingNoShows(
+			@Param("spotId") Long spotId,
+			@Param("vehicleId") Long vehicleId,
+			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff
+	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query(value = """
+			WITH due AS (
+			    SELECT id
+			    FROM reservations
+			    WHERE status = 'ACTIVE'
+			      AND (end_at <= :now OR start_at <= :activeStartCutoff)
+			      AND NOT EXISTS (
+			          SELECT 1
+			          FROM parking_visits visit
+			          WHERE visit.reservation_id = reservations.id
+			      )
+			    ORDER BY id
+			    LIMIT :batchSize
+			    FOR UPDATE SKIP LOCKED
+			)
+			UPDATE reservations reservation
+			SET status = 'EXPIRED'
+			FROM due
+			WHERE reservation.id = due.id
+			  AND reservation.status = 'ACTIVE'
+			""", nativeQuery = true)
+	int expireDueNoShows(
+			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff,
+			@Param("batchSize") int batchSize
+	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query(value = """
+			UPDATE reservations reservation
+			SET status = 'EXPIRED'
+			WHERE user_id = :userId
+			  AND status = 'ACTIVE'
+			  AND (end_at <= :now OR start_at <= :activeStartCutoff)
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM parking_visits visit
+			      WHERE visit.reservation_id = reservation.id
+			  )
+			""", nativeQuery = true)
+	int expireNoShowsForUser(
+			@Param("userId") Long userId,
+			@Param("now") Instant now,
+			@Param("activeStartCutoff") Instant activeStartCutoff
 	);
 
 	@Modifying(flushAutomatically = true)
