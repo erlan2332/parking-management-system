@@ -121,7 +121,10 @@ class BarrierIntegrationTest {
 		assertEquals(ParkingSpotStatus.OCCUPIED, parkingSpotService.getCurrentSpotState(spot("A2").getId()).status());
 
 		clock.advance(Duration.ofMinutes(85));
-		ParkingVisitEntity completed = barrierService.exit(driver.user().getId(), driver.vehicle().getPlateNumber());
+		ParkingVisitEntity completed = barrierService.exit(
+				driver.user().getId(),
+				driver.vehicle().getPlateNumber()
+		).visit();
 		assertEquals(ParkingVisitStatus.COMPLETED, completed.getStatus());
 		assertEquals(5100, Duration.between(completed.getEnteredAt(), completed.getExitedAt()).getSeconds());
 		assertEquals(
@@ -191,7 +194,10 @@ class BarrierIntegrationTest {
 				() -> barrierService.enter(driver.user().getId(), driver.vehicle().getPlateNumber())
 		);
 		clock.advance(Duration.ofMinutes(10));
-		ParkingVisitEntity completed = barrierService.exit(driver.user().getId(), driver.vehicle().getPlateNumber());
+		ParkingVisitEntity completed = barrierService.exit(
+				driver.user().getId(),
+				driver.vehicle().getPlateNumber()
+		).visit();
 		Instant firstExitTime = completed.getExitedAt();
 		clock.advance(Duration.ofMinutes(10));
 		assertThrows(
@@ -443,6 +449,7 @@ class BarrierIntegrationTest {
 	}
 
 	private void cleanBusinessData() {
+		jdbcTemplate.update("DELETE FROM invoices");
 		jdbcTemplate.update("DELETE FROM parking_visits");
 		jdbcTemplate.update("DELETE FROM reservations");
 		jdbcTemplate.update("DELETE FROM vehicles");

@@ -17,7 +17,8 @@ public class ParkingPricingService {
 
 	private static final String CURRENCY = "KGS";
 	private static final BigDecimal SECONDS_PER_MINUTE = BigDecimal.valueOf(60);
-	private static final int MONEY_SCALE = 2;
+	private static final int COMPONENT_SCALE = 6;
+	private static final int TOTAL_SCALE = 2;
 
 	private final ParkingPricingProperties properties;
 
@@ -35,12 +36,13 @@ public class ParkingPricingService {
 		TariffDurations durations = splitByTariff(requiredEntry, requiredExit);
 		BigDecimal dayNumerator = costNumerator(durations.daySeconds(), properties.dayRatePerMinute());
 		BigDecimal nightNumerator = costNumerator(durations.nightSeconds(), properties.nightRatePerMinute());
-		BigDecimal dayCost = monetaryAmount(dayNumerator);
-		BigDecimal nightCost = monetaryAmount(nightNumerator);
-		BigDecimal totalCost = monetaryAmount(dayNumerator.add(nightNumerator));
+		BigDecimal dayCost = componentAmount(dayNumerator);
+		BigDecimal nightCost = componentAmount(nightNumerator);
+		BigDecimal totalCost = totalAmount(dayNumerator.add(nightNumerator));
 
 		return new ParkingCostBreakdown(
 				CURRENCY,
+				properties.zoneId().getId(),
 				durations.totalSeconds(),
 				durations.daySeconds(),
 				durations.nightSeconds(),
@@ -110,8 +112,12 @@ public class ParkingPricingService {
 		return BigDecimal.valueOf(durationSeconds).multiply(ratePerMinute);
 	}
 
-	private static BigDecimal monetaryAmount(BigDecimal numerator) {
-		return numerator.divide(SECONDS_PER_MINUTE, MONEY_SCALE, RoundingMode.HALF_UP);
+	private static BigDecimal componentAmount(BigDecimal numerator) {
+		return numerator.divide(SECONDS_PER_MINUTE, COMPONENT_SCALE, RoundingMode.HALF_UP);
+	}
+
+	private static BigDecimal totalAmount(BigDecimal numerator) {
+		return numerator.divide(SECONDS_PER_MINUTE, TOTAL_SCALE, RoundingMode.HALF_UP);
 	}
 
 	private record TariffDurations(long totalSeconds, long daySeconds, long nightSeconds) {

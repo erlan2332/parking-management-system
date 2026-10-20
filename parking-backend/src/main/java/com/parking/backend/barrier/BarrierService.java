@@ -6,6 +6,8 @@ import com.parking.backend.common.exception.ReservationEntryConflictException;
 import com.parking.backend.common.exception.VehicleAlreadyParkedException;
 import com.parking.backend.common.exception.VehicleNotFoundException;
 import com.parking.backend.common.persistence.DatabaseConstraintViolationDetector;
+import com.parking.backend.invoice.InvoiceEntity;
+import com.parking.backend.invoice.InvoiceService;
 import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
 import com.parking.backend.reservation.ReservationEntity;
@@ -15,6 +17,7 @@ import com.parking.backend.vehicle.PlateNormalizer;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
 import com.parking.backend.visit.ParkingVisitEntity;
+import com.parking.backend.visit.ParkingVisitLockTarget;
 import com.parking.backend.visit.ParkingVisitRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -43,6 +46,7 @@ public class BarrierService {
 	private final ParkingSpotRepository parkingSpotRepository;
 	private final ReservationRepository reservationRepository;
 	private final ParkingVisitRepository parkingVisitRepository;
+	private final InvoiceService invoiceService;
 	private final Clock clock;
 
 	public BarrierService(
@@ -51,6 +55,7 @@ public class BarrierService {
 			ParkingSpotRepository parkingSpotRepository,
 			ReservationRepository reservationRepository,
 			ParkingVisitRepository parkingVisitRepository,
+			InvoiceService invoiceService,
 			Clock clock
 	) {
 		this.plateNormalizer = plateNormalizer;
@@ -58,6 +63,7 @@ public class BarrierService {
 		this.parkingSpotRepository = parkingSpotRepository;
 		this.reservationRepository = reservationRepository;
 		this.parkingVisitRepository = parkingVisitRepository;
+		this.invoiceService = invoiceService;
 		this.clock = clock;
 	}
 
@@ -90,22 +96,23 @@ public class BarrierService {
 	}
 
 	@Transactional
-	public ParkingVisitEntity exit(Long userId, String plateNumber) {
+	public BarrierExitResult exit(Long userId, String plateNumber) {
 		VehicleEntity vehicle = findOwnedVehicle(userId, plateNumber);
-		ParkingVisitEntity activeVisit = parkingVisitRepository
-				.findByVehicle_IdAndExitedAtIsNull(vehicle.getId())
+		ParkingVisitLockTarget lockTarget = parkingVisitRepository
+				.findActiveLockTargetByVehicleId(vehicle.getId())
 				.orElseThrow(NoActiveVisitException::new);
 
 		// All mutating barrier flows keep the same lock order: spot, vehicle, related record.
-		parkingSpotRepository.findByIdForUpdate(activeVisit.getSpot().getId())
+		parkingSpotRepository.findByIdForUpdate(lockTarget.spotId())
 				.orElseThrow(NoActiveVisitException::new);
 		vehicleRepository.findOwnedByIdForUpdate(vehicle.getId(), userId)
 				.orElseThrow(VehicleNotFoundException::new);
-		ParkingVisitEntity lockedVisit = parkingVisitRepository.findByIdForUpdate(activeVisit.getId())
+		ParkingVisitEntity lockedVisit = parkingVisitRepository.findByIdForUpdate(lockTarget.visitId())
 				.filter(visit -> visit.getExitedAt() == null)
 				.orElseThrow(NoActiveVisitException::new);
 
-		lockedVisit.complete(clock.instant());
+		Instant exitedAt = clock.instant();
+		lockedVisit.complete(exitedAt);
 		ReservationEntity reservation = lockedVisit.getReservation();
 		if (reservation != null) {
 			ReservationEntity lockedReservation = reservationRepository
@@ -116,7 +123,8 @@ public class BarrierService {
 			}
 			lockedReservation.complete();
 		}
-		return lockedVisit;
+		InvoiceEntity invoice = invoiceService.issueForVisit(lockedVisit, exitedAt);
+		return new BarrierExitResult(lockedVisit, invoice);
 	}
 
 	private ParkingVisitEntity enterWithReservation(

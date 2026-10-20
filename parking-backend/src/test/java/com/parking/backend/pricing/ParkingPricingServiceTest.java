@@ -23,42 +23,42 @@ class ParkingPricingServiceTest {
 	void calculatesDayOnlyParking() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T14:00:00+06:00", "2026-12-01T15:30:00+06:00");
 
-		assertBreakdown(cost, 5_400, 5_400, 0, "180.00", "0.00", "180.00");
+		assertBreakdown(cost, 5_400, 5_400, 0, "180.000000", "0.000000", "180.00");
 	}
 
 	@Test
 	void calculatesNightOnlyParking() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T22:00:00+06:00", "2026-12-01T23:30:00+06:00");
 
-		assertBreakdown(cost, 5_400, 0, 5_400, "0.00", "90.00", "90.00");
+		assertBreakdown(cost, 5_400, 0, 5_400, "0.000000", "90.000000", "90.00");
 	}
 
 	@Test
 	void splitsParkingAtDayToNightBoundary() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T19:30:00+06:00", "2026-12-01T20:30:00+06:00");
 
-		assertBreakdown(cost, 3_600, 1_800, 1_800, "60.00", "30.00", "90.00");
+		assertBreakdown(cost, 3_600, 1_800, 1_800, "60.000000", "30.000000", "90.00");
 	}
 
 	@Test
 	void splitsParkingAtNightToDayBoundary() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T07:30:00+06:00", "2026-12-01T08:30:00+06:00");
 
-		assertBreakdown(cost, 3_600, 1_800, 1_800, "60.00", "30.00", "90.00");
+		assertBreakdown(cost, 3_600, 1_800, 1_800, "60.000000", "30.000000", "90.00");
 	}
 
 	@Test
 	void calculatesParkingAcrossMidnight() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T19:00:00+06:00", "2026-12-02T09:00:00+06:00");
 
-		assertBreakdown(cost, 50_400, 7_200, 43_200, "240.00", "720.00", "960.00");
+		assertBreakdown(cost, 50_400, 7_200, 43_200, "240.000000", "720.000000", "960.00");
 	}
 
 	@Test
 	void appliesTariffsForEveryDayOfMultiDayParking() {
 		ParkingCostBreakdown cost = calculate("2026-12-01T07:00:00+06:00", "2026-12-03T09:00:00+06:00");
 
-		assertBreakdown(cost, 180_000, 90_000, 90_000, "3000.00", "1500.00", "4500.00");
+		assertBreakdown(cost, 180_000, 90_000, 90_000, "3000.000000", "1500.000000", "4500.00");
 	}
 
 	@Test
@@ -66,8 +66,8 @@ class ParkingPricingServiceTest {
 		ParkingCostBreakdown fullDay = calculate("2026-12-01T05:00:00+03:00", "2026-12-01T17:00:00+03:00");
 		ParkingCostBreakdown fromDayEnd = calculate("2026-12-01T20:00:00+06:00", "2026-12-01T21:00:00+06:00");
 
-		assertBreakdown(fullDay, 43_200, 43_200, 0, "1440.00", "0.00", "1440.00");
-		assertBreakdown(fromDayEnd, 3_600, 0, 3_600, "0.00", "60.00", "60.00");
+		assertBreakdown(fullDay, 43_200, 43_200, 0, "1440.000000", "0.000000", "1440.00");
+		assertBreakdown(fromDayEnd, 3_600, 0, 3_600, "0.000000", "60.000000", "60.00");
 	}
 
 	@Test
@@ -82,9 +82,9 @@ class ParkingPricingServiceTest {
 				instant("2026-12-01T20:00:01+06:00")
 		);
 
-		assertBreakdown(thirtySeconds, 30, 30, 0, "1.00", "0.00", "1.00");
-		assertEquals(new BigDecimal("0.03"), acrossBoundary.dayCost());
-		assertEquals(new BigDecimal("0.03"), acrossBoundary.nightCost());
+		assertBreakdown(thirtySeconds, 30, 30, 0, "1.000000", "0.000000", "1.00");
+		assertEquals(new BigDecimal("0.025000"), acrossBoundary.dayCost());
+		assertEquals(new BigDecimal("0.025000"), acrossBoundary.nightCost());
 		assertEquals(new BigDecimal("0.05"), acrossBoundary.totalCost());
 	}
 
@@ -104,7 +104,15 @@ class ParkingPricingServiceTest {
 				NIGHT_RATE
 		));
 
-		assertBreakdown(pricingService.calculate(instant, instant), 0, 0, 0, "0.00", "0.00", "0.00");
+		assertBreakdown(
+				pricingService.calculate(instant, instant),
+				0,
+				0,
+				0,
+				"0.000000",
+				"0.000000",
+				"0.00"
+		);
 	}
 
 	private ParkingCostBreakdown calculate(String enteredAt, String exitedAt) {
@@ -135,6 +143,7 @@ class ParkingPricingServiceTest {
 			String totalCost
 	) {
 		assertEquals("KGS", cost.currency());
+		assertEquals("Asia/Bishkek", cost.pricingZoneId());
 		assertEquals(totalSeconds, cost.totalDurationSeconds());
 		assertEquals(daySeconds, cost.dayDurationSeconds());
 		assertEquals(nightSeconds, cost.nightDurationSeconds());

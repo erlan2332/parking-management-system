@@ -15,6 +15,14 @@ public interface ParkingVisitRepository extends JpaRepository<ParkingVisitEntity
 	@EntityGraph(attributePaths = {"vehicle", "spot", "reservation"})
 	Optional<ParkingVisitEntity> findByVehicle_IdAndExitedAtIsNull(Long vehicleId);
 
+	@Query("""
+			SELECT new com.parking.backend.visit.ParkingVisitLockTarget(visit.id, visit.spot.id)
+			FROM ParkingVisitEntity visit
+			WHERE visit.vehicle.id = :vehicleId
+			  AND visit.exitedAt IS NULL
+			""")
+	Optional<ParkingVisitLockTarget> findActiveLockTargetByVehicleId(@Param("vehicleId") Long vehicleId);
+
 	boolean existsByVehicle_IdAndExitedAtIsNull(Long vehicleId);
 
 	boolean existsBySpot_IdAndExitedAtIsNull(Long spotId);

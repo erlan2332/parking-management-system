@@ -1,9 +1,12 @@
 package com.parking.backend.barrier.dto;
 
+import com.parking.backend.barrier.BarrierExitResult;
+import com.parking.backend.invoice.InvoiceEntity;
 import com.parking.backend.visit.ParkingEntryType;
 import com.parking.backend.visit.ParkingVisitEntity;
 import com.parking.backend.visit.ParkingVisitStatus;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -15,10 +18,16 @@ public record BarrierExitResponse(
 		Instant enteredAt,
 		Instant exitedAt,
 		long durationSeconds,
-		ParkingVisitStatus status
+		ParkingVisitStatus status,
+		Long invoiceId,
+		String invoiceNumber,
+		BigDecimal totalAmount,
+		String currency
 ) {
 
-	public static BarrierExitResponse from(ParkingVisitEntity visit) {
+	public static BarrierExitResponse from(BarrierExitResult result) {
+		ParkingVisitEntity visit = result.visit();
+		InvoiceEntity invoice = result.invoice();
 		return new BarrierExitResponse(
 				visit.getId(),
 				visit.getVehicle().getNormalizedPlate(),
@@ -27,7 +36,11 @@ public record BarrierExitResponse(
 				visit.getEnteredAt(),
 				visit.getExitedAt(),
 				Duration.between(visit.getEnteredAt(), visit.getExitedAt()).getSeconds(),
-				visit.getStatus()
+				visit.getStatus(),
+				invoice.getId(),
+				invoice.getInvoiceNumber(),
+				invoice.getTotalAmount(),
+				invoice.getCurrency()
 		);
 	}
 }
