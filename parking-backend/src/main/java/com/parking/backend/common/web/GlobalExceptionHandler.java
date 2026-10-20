@@ -10,6 +10,8 @@ import com.parking.backend.common.exception.InvalidReservationRequestException;
 import com.parking.backend.common.exception.NoActiveVisitException;
 import com.parking.backend.common.exception.NoAvailableParkingSpotException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
+import com.parking.backend.common.exception.ParkingVisitNotCompletedException;
+import com.parking.backend.common.exception.ParkingVisitNotFoundException;
 import com.parking.backend.common.exception.ReservationConflictException;
 import com.parking.backend.common.exception.ReservationEntryConflictException;
 import com.parking.backend.common.exception.ReservationNotFoundException;
@@ -101,6 +103,11 @@ public class GlobalExceptionHandler {
 		return error(HttpStatus.CONFLICT, "NO_ACTIVE_VISIT", exception.getMessage());
 	}
 
+	@ExceptionHandler(ParkingVisitNotCompletedException.class)
+	ResponseEntity<ApiErrorResponse> handleParkingVisitNotCompleted(ParkingVisitNotCompletedException exception) {
+		return error(HttpStatus.CONFLICT, "PARKING_VISIT_NOT_COMPLETED", exception.getMessage());
+	}
+
 	@ExceptionHandler(InvalidPlateNumberException.class)
 	ResponseEntity<ApiErrorResponse> handleInvalidPlate(InvalidPlateNumberException exception) {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_PLATE_NUMBER", exception.getMessage());
@@ -139,6 +146,11 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ParkingSpotNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> handleParkingSpotNotFound() {
 		return error(HttpStatus.NOT_FOUND, "PARKING_SPOT_NOT_FOUND", "Parking spot was not found");
+	}
+
+	@ExceptionHandler(ParkingVisitNotFoundException.class)
+	ResponseEntity<ApiErrorResponse> handleParkingVisitNotFound() {
+		return error(HttpStatus.NOT_FOUND, "PARKING_VISIT_NOT_FOUND", "Parking visit was not found");
 	}
 
 	@ExceptionHandler(ReservationNotFoundException.class)

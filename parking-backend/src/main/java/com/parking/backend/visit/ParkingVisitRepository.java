@@ -34,4 +34,6 @@ public interface ParkingVisitRepository extends JpaRepository<ParkingVisitEntity
 
 	@EntityGraph(attributePaths = {"vehicle", "spot", "reservation"})
 	List<ParkingVisitEntity> findAllByVehicle_User_IdOrderByEnteredAtDescIdDesc(Long userId);
+
+	Optional<ParkingVisitEntity> findByIdAndVehicle_User_Id(Long id, Long userId);
 }
