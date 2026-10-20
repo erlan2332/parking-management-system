@@ -3,6 +3,7 @@ package com.parking.backend.barrier;
 import com.parking.backend.common.exception.NoActiveVisitException;
 import com.parking.backend.common.exception.NoAvailableParkingSpotException;
 import com.parking.backend.common.exception.ReservationEntryConflictException;
+import com.parking.backend.common.exception.ReservationNoShowExpiredException;
 import com.parking.backend.common.exception.VehicleAlreadyParkedException;
 import com.parking.backend.common.exception.VehicleNotFoundException;
 import com.parking.backend.common.persistence.DatabaseConstraintViolationDetector;
@@ -11,6 +12,8 @@ import com.parking.backend.invoice.InvoiceService;
 import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
 import com.parking.backend.reservation.ReservationEntity;
+import com.parking.backend.reservation.ReservationEntryPolicy;
+import com.parking.backend.reservation.ReservationEntryTarget;
 import com.parking.backend.reservation.ReservationRepository;
 import com.parking.backend.reservation.ReservationStatus;
 import com.parking.backend.vehicle.PlateNormalizer;
@@ -24,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -32,12 +34,10 @@ import java.util.Set;
 @Service
 public class BarrierService {
 
-	private static final Duration RESERVATION_ENTRY_GRACE_PERIOD = Duration.ofMinutes(15);
 	private static final String ACTIVE_VEHICLE_CONSTRAINT = "uk_parking_visits_active_vehicle";
 	private static final String ACTIVE_SPOT_CONSTRAINT = "uk_parking_visits_active_spot";
 	private static final String RESERVATION_VISIT_CONSTRAINT = "uk_parking_visits_reservation";
 	private static final Set<ReservationStatus> VEHICLE_OBLIGATION_STATUSES = Set.of(
-			ReservationStatus.ACTIVE,
 			ReservationStatus.CHECKED_IN
 	);
 
@@ -47,6 +47,7 @@ public class BarrierService {
 	private final ReservationRepository reservationRepository;
 	private final ParkingVisitRepository parkingVisitRepository;
 	private final InvoiceService invoiceService;
+	private final ReservationEntryPolicy entryPolicy;
 	private final Clock clock;
 
 	public BarrierService(
@@ -56,6 +57,7 @@ public class BarrierService {
 			ReservationRepository reservationRepository,
 			ParkingVisitRepository parkingVisitRepository,
 			InvoiceService invoiceService,
+			ReservationEntryPolicy entryPolicy,
 			Clock clock
 	) {
 		this.plateNormalizer = plateNormalizer;
@@ -64,10 +66,11 @@ public class BarrierService {
 		this.reservationRepository = reservationRepository;
 		this.parkingVisitRepository = parkingVisitRepository;
 		this.invoiceService = invoiceService;
+		this.entryPolicy = entryPolicy;
 		this.clock = clock;
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = ReservationNoShowExpiredException.class)
 	public ParkingVisitEntity enter(Long userId, String plateNumber) {
 		VehicleEntity vehicle = findOwnedVehicle(userId, plateNumber);
 		if (parkingVisitRepository.existsByVehicle_IdAndExitedAtIsNull(vehicle.getId())) {
@@ -75,17 +78,39 @@ public class BarrierService {
 		}
 
 		Instant now = clock.instant();
-		List<ReservationEntity> activeReservations = reservationRepository
-				.findAllByVehicle_IdAndStatusOrderByStartAtAscIdAsc(vehicle.getId(), ReservationStatus.ACTIVE);
-		ReservationEntity applicableReservation = activeReservations.stream()
-				.filter(reservation -> isWithinEntryWindow(reservation, now))
+		List<ReservationEntryTarget> activeReservations = reservationRepository
+				.findActiveEntryTargetsByVehicleId(vehicle.getId(), ReservationStatus.ACTIVE);
+		ReservationEntryTarget applicableReservation = activeReservations.stream()
+				.filter(reservation -> entryPolicy.allowsEntry(
+						reservation.startAt(),
+						reservation.endAt(),
+						now
+				))
 				.findFirst()
 				.orElse(null);
 		if (applicableReservation != null) {
 			return enterWithReservation(userId, vehicle, applicableReservation);
 		}
+		ReservationEntryTarget expiredReservation = activeReservations.stream()
+				.filter(reservation -> entryPolicy.isExpiredAt(
+						reservation.startAt(),
+						reservation.endAt(),
+						now
+				))
+				.findFirst()
+				.orElse(null);
+		if (expiredReservation != null) {
+			expireLateReservation(userId, vehicle, expiredReservation);
+		}
 		if (!activeReservations.isEmpty()) {
 			throw new ReservationEntryConflictException("Reservation is outside its permitted entry window");
+		}
+		if (reservationRepository.existsCurrentNoShowForVehicle(
+				vehicle.getId(),
+				ReservationStatus.EXPIRED,
+				now
+		)) {
+			throw new ReservationNoShowExpiredException();
 		}
 		if (hasVehicleObligation(vehicle.getId(), now)) {
 			throw new ReservationEntryConflictException(
@@ -130,9 +155,9 @@ public class BarrierService {
 	private ParkingVisitEntity enterWithReservation(
 			Long userId,
 			VehicleEntity unlockedVehicle,
-			ReservationEntity reservationCandidate
+			ReservationEntryTarget reservationCandidate
 	) {
-		ParkingSpotEntity spot = parkingSpotRepository.findByIdForUpdate(reservationCandidate.getSpot().getId())
+		ParkingSpotEntity spot = parkingSpotRepository.findByIdForUpdate(reservationCandidate.spotId())
 				.orElseThrow(() -> new ReservationEntryConflictException("Reserved parking spot was not found"));
 		if (!spot.isActive()) {
 			throw new ReservationEntryConflictException("Reserved parking spot is unavailable");
@@ -146,13 +171,18 @@ public class BarrierService {
 		}
 
 		ReservationEntity reservation = reservationRepository
-				.findOwnedByIdForUpdate(reservationCandidate.getId(), userId)
+				.findOwnedByIdForUpdate(reservationCandidate.reservationId(), userId)
 				.orElseThrow(() -> new ReservationEntryConflictException("Reservation was not found"));
 		Instant enteredAt = clock.instant();
+		if (reservation.getStatus() == ReservationStatus.ACTIVE
+				&& entryPolicy.isExpiredAt(reservation.getStartAt(), reservation.getEndAt(), enteredAt)) {
+			reservation.expireNoShow();
+			throw new ReservationNoShowExpiredException();
+		}
 		if (reservation.getStatus() != ReservationStatus.ACTIVE
 				|| !reservation.getVehicle().getId().equals(vehicle.getId())
 				|| !reservation.getSpot().getId().equals(spot.getId())
-				|| !isWithinEntryWindow(reservation, enteredAt)) {
+				|| !entryPolicy.allowsEntry(reservation.getStartAt(), reservation.getEndAt(), enteredAt)) {
 			throw new ReservationEntryConflictException("Reservation is not eligible for entry");
 		}
 
@@ -176,7 +206,10 @@ public class BarrierService {
 	}
 
 	private ParkingSpotEntity lockFirstAvailableWalkInSpot(Instant selectionTime) {
-		for (Long candidateId : parkingSpotRepository.findWalkInCandidateIds(selectionTime)) {
+		for (Long candidateId : parkingSpotRepository.findWalkInCandidateIds(
+				selectionTime,
+				entryPolicy.activeStartCutoff(selectionTime)
+		)) {
 			ParkingSpotEntity candidate = parkingSpotRepository.findByIdForUpdate(candidateId)
 					.orElseThrow(NoAvailableParkingSpotException::new);
 			Instant recheckTime = clock.instant();
@@ -185,7 +218,9 @@ public class BarrierService {
 					&& !reservationRepository.existsBlockingObligationForSpot(
 							candidateId,
 							recheckTime,
+							entryPolicy.activeStartCutoff(recheckTime),
 							ReservationStatus.HELD,
+							ReservationStatus.ACTIVE,
 							VEHICLE_OBLIGATION_STATUSES
 					)) {
 				return candidate;
@@ -210,9 +245,31 @@ public class BarrierService {
 		return reservationRepository.existsBlockingObligationForVehicle(
 				vehicleId,
 				now,
+				entryPolicy.activeStartCutoff(now),
 				ReservationStatus.HELD,
+				ReservationStatus.ACTIVE,
 				VEHICLE_OBLIGATION_STATUSES
 		);
+	}
+
+	private void expireLateReservation(
+			Long userId,
+			VehicleEntity unlockedVehicle,
+			ReservationEntryTarget target
+	) {
+		parkingSpotRepository.findByIdForUpdate(target.spotId())
+				.orElseThrow(() -> new ReservationEntryConflictException("Reserved parking spot was not found"));
+		vehicleRepository.findOwnedByIdForUpdate(unlockedVehicle.getId(), userId)
+				.orElseThrow(VehicleNotFoundException::new);
+		ReservationEntity reservation = reservationRepository
+				.findOwnedByIdForUpdate(target.reservationId(), userId)
+				.orElseThrow(() -> new ReservationEntryConflictException("Reservation was not found"));
+		Instant now = clock.instant();
+		if (reservation.getStatus() == ReservationStatus.ACTIVE
+				&& entryPolicy.isExpiredAt(reservation.getStartAt(), reservation.getEndAt(), now)) {
+			reservation.expireNoShow();
+		}
+		throw new ReservationNoShowExpiredException();
 	}
 
 	private ParkingVisitEntity saveVisit(ParkingVisitEntity visit) {
@@ -232,15 +289,4 @@ public class BarrierService {
 		}
 	}
 
-	private static boolean isWithinEntryWindow(ReservationEntity reservation, Instant instant) {
-		Instant deadline = earlierOf(
-				reservation.getEndAt(),
-				reservation.getStartAt().plus(RESERVATION_ENTRY_GRACE_PERIOD)
-		);
-		return !instant.isBefore(reservation.getStartAt()) && instant.isBefore(deadline);
-	}
-
-	private static Instant earlierOf(Instant first, Instant second) {
-		return first.isBefore(second) ? first : second;
-	}
 }

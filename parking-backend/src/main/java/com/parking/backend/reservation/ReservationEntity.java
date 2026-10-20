@@ -146,6 +146,13 @@ public class ReservationEntity {
 		status = ReservationStatus.HOLD_EXPIRED;
 	}
 
+	public void expireNoShow() {
+		if (status != ReservationStatus.ACTIVE) {
+			throw new IllegalStateException("Only an active reservation can expire as a no-show");
+		}
+		status = ReservationStatus.EXPIRED;
+	}
+
 	public void confirm(Instant confirmedAt) {
 		status = ReservationStatus.ACTIVE;
 		this.confirmedAt = Objects.requireNonNull(confirmedAt, "Confirmation time must not be null");

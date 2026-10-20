@@ -25,7 +25,9 @@ through a secured REST API. The barrier simulator supports reservation and
 walk-in entry, physical exit, and visit history. Exit atomically completes the
 visit and issues an invoice that preserves the applied day/night rates and
 amount. Drivers can review their invoice history through secured REST APIs.
-The frontend is not implemented yet.
+Confirmed reservations expire automatically after a missed entry window, and
+checked-in drivers can receive one ending-soon email reminder when SMTP is
+enabled. The frontend is not implemented yet.
 
 ## Planned Features
 
@@ -33,7 +35,6 @@ The frontend is not implemented yet.
 - Parking spot management
 - Payments and payment history
 - WebSocket real-time updates
-- Email notifications
 
 ## Local Development
 
@@ -70,6 +71,9 @@ export PARKING_DAY_END='20:00'
 export PARKING_DAY_RATE_PER_MINUTE='2.00'
 export PARKING_NIGHT_RATE_PER_MINUTE='1.00'
 
+export RESERVATION_AUTOMATION_DELAY='PT30S'
+export MAIL_ENABLED='false'
+
 export TEST_DB_URL='jdbc:postgresql://localhost:5432/parking_test_db'
 export TEST_DB_USERNAME='parking_user'
 export TEST_DB_PASSWORD='choose_a_local_password'
@@ -87,6 +91,9 @@ Pricing defaults to `Asia/Bishkek`, a half-open day period of `[08:00, 20:00)`,
 `2.00 KGS` per day minute, and `1.00 KGS` per night minute. The five
 `PARKING_*` variables above override the zone, boundaries, and rates. Rates
 must be zero or positive, and the day start must be earlier than the day end.
+Reservation automation runs every 30 seconds by default. Email is disabled by
+default, so cleanup, registration, reservations, the barrier, and invoices run
+without an SMTP server.
 
 ### Build and run
 
@@ -131,6 +138,11 @@ Migration V6 adds `invoices`. Each completed visit can have at most one invoice,
 and PostgreSQL validates its currency, non-negative durations, rates and costs,
 duration split, and timestamp order. The visit foreign key uses `ON DELETE
 RESTRICT`, so an issued financial record is not removed through a visit cascade.
+
+Migration V7 adds `reservation_notifications` with a restrictive reservation
+foreign key, a unique `(reservation_id, notification_type)` pair, constrained
+processing statuses, attempt history, and an index for pending work. It also
+adds a partial index for finding due `ACTIVE` no-show reservations.
 
 ### Driver API
 
@@ -207,9 +219,12 @@ curl -sS -X POST "http://localhost:8080/api/reservations/$HOLD_ID/cancel" \
 ```
 
 Use `POST /api/reservations/holds/{id}/release` instead of confirmation to
-voluntarily return a held spot. Automatic no-show expiration, tariffs,
-payments, WebSocket updates, and a frontend remain outside the current stage;
-clients receive current state when they poll the API.
+voluntarily return a held spot. The three-minute `HOLD_EXPIRED` rule applies
+only to unconfirmed holds. A confirmed `ACTIVE` booking instead becomes
+`EXPIRED` when entry has not happened by `min(endAt, startAt + 15 minutes)`.
+This no-show transition creates no visit, invoice, fee, or penalty. Availability
+and hold creation treat that deadline as effective immediately, even before the
+next scheduled database update, so an expired booking no longer blocks a spot.
 
 ### Barrier and parking visits
 
@@ -249,9 +264,58 @@ curl -sS -X POST 'http://localhost:8080/api/barrier/exit' \
   -d '{"plateNumber":"01KG123ABC"}'
 ```
 
-Exit does not require or simulate payment. Automatic no-show expiration, live
-WebSocket updates, and control of physical barrier hardware remain outside the
-current stage.
+Exit does not require or simulate payment. Live WebSocket updates and control
+of physical barrier hardware remain outside the current stage.
+
+### Reservation automation and email reminders
+
+One scheduled task runs every 30 seconds by default. It retains the existing
+temporary-hold cleanup, expires confirmed no-shows in bounded PostgreSQL
+batches, and processes ending-soon reminders. Entry and expiration use the
+same half-open 15-minute deadline and lock order (spot, vehicle, reservation),
+so the exact deadline is already too late and concurrent work cannot leave an
+`EXPIRED` booking with an active visit.
+
+An email reminder is eligible only in `[endAt - 10 minutes, endAt)` while the
+booking is `CHECKED_IN` and its linked visit is still active. This also covers
+a short booking when entry happens with less than ten minutes remaining. An
+early exit prevents the message; walk-in visits, no-shows, and cancelled
+bookings are not eligible. The plain-text message uses the vehicle owner's
+stored email address and displays the planned end time in `Asia/Bishkek`.
+
+Email is disabled by default. To use a local test SMTP server such as Mailpit:
+
+```bash
+docker run --rm -p 1025:1025 -p 8025:8025 axllent/mailpit
+export MAIL_ENABLED='true'
+export MAIL_HOST='localhost'
+export MAIL_PORT='1025'
+export MAIL_FROM='parking@example.test'
+export MAIL_STARTTLS_ENABLED='false'
+./parking-backend/gradlew -p parking-backend bootRun
+```
+
+Mailpit then shows captured messages at `http://localhost:8025`. Authenticated
+SMTP can additionally use `MAIL_USERNAME` and `MAIL_PASSWORD`; both must be
+set together. Connect, read, and write timeouts default to five seconds and can
+be overridden with `MAIL_CONNECT_TIMEOUT`, `MAIL_READ_TIMEOUT`, and
+`MAIL_WRITE_TIMEOUT`. Leaving `MAIL_ENABLED=false` requires no SMTP settings
+and does not disable no-show cleanup or any backend feature.
+
+The PostgreSQL outbox has a unique notification type per reservation and uses
+row claiming with `SKIP LOCKED`, retryable failures, and stale `SENDING`
+recovery. SMTP itself cannot provide end-to-end exactly-once delivery: if a
+server accepts a message and the application stops before recording `SENT`, a
+later retry can still duplicate it. Automated tests therefore verify
+application-level deduplication with a fake transport; they never contact a
+real mailbox. Controlled `Clock` integration tests exercise both automation paths
+without waiting 10 or 15 real minutes:
+
+```bash
+cd parking-backend
+./gradlew test --tests '*ReservationAutomationIntegrationTest' \
+  --tests '*ReservationReminderIntegrationTest'
+```
 
 ### Parking pricing
 
@@ -323,13 +387,15 @@ container and its data are removed automatically when the job finishes. JWT
 secrets are generated for each workflow run and are not stored in the
 repository.
 
-The workflow assembles the Spring Boot JAR and runs 19 tagged smoke tests for
+The workflow assembles the Spring Boot JAR and runs 21 tagged smoke tests for
 application startup and Flyway, registration and login, JWT protection,
 vehicle creation and ownership, duplicate handling, parking spot listing, and
 availability validation, reservation lifecycle, concurrent hold protection,
 reservation entry/exit, concurrent walk-in allocation, and pricing across the
 day/night boundary, automatic invoice issuance, and concurrent double-charge
-protection. The check appears in a pull request as
+protection. It also covers exact-boundary no-show expiration and one-time email
+reminder processing through a fake transport. The check appears in a pull
+request as
 `Backend CI / Build and Smoke Tests`. If the job fails, its Checks page contains
 the logs and a downloadable `backend-smoke-test-reports-*` artifact with the
 JUnit/Gradle reports, retained for seven days.

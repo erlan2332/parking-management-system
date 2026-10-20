@@ -3,6 +3,7 @@ package com.parking.backend.parking;
 import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
 import com.parking.backend.reservation.ReservationEntity;
+import com.parking.backend.reservation.ReservationEntryPolicy;
 import com.parking.backend.reservation.ReservationRepository;
 import com.parking.backend.reservation.ReservationStatus;
 import com.parking.backend.visit.ParkingVisitEntity;
@@ -24,24 +25,26 @@ import java.util.stream.Collectors;
 public class ParkingSpotService {
 
 	private static final Set<ReservationStatus> PERSISTENT_BLOCKING_STATUSES = Set.of(
-			ReservationStatus.ACTIVE,
 			ReservationStatus.CHECKED_IN
 	);
 
 	private final ParkingSpotRepository parkingSpotRepository;
 	private final ReservationRepository reservationRepository;
 	private final ParkingVisitRepository parkingVisitRepository;
+	private final ReservationEntryPolicy entryPolicy;
 	private final Clock clock;
 
 	public ParkingSpotService(
 			ParkingSpotRepository parkingSpotRepository,
 			ReservationRepository reservationRepository,
 			ParkingVisitRepository parkingVisitRepository,
+			ReservationEntryPolicy entryPolicy,
 			Clock clock
 	) {
 		this.parkingSpotRepository = parkingSpotRepository;
 		this.reservationRepository = reservationRepository;
 		this.parkingVisitRepository = parkingVisitRepository;
+		this.entryPolicy = entryPolicy;
 		this.clock = clock;
 	}
 
@@ -117,7 +120,9 @@ public class ParkingSpotService {
 				startAt,
 				endAt,
 				now,
+				entryPolicy.activeStartCutoff(now),
 				ReservationStatus.HELD,
+				ReservationStatus.ACTIVE,
 				PERSISTENT_BLOCKING_STATUSES
 		).stream().collect(Collectors.groupingBy(reservation -> reservation.getSpot().getId()));
 	}

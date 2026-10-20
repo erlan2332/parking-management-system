@@ -5,6 +5,8 @@ spring:
     password: ${TEST_DB_PASSWORD:}
 
 application:
+  reservations:
+    automation-delay: PT1H
   security:
     jwt:
       secret-base64: ${TEST_JWT_SECRET_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}

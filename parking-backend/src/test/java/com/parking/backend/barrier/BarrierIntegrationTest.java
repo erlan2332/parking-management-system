@@ -151,7 +151,7 @@ class BarrierIntegrationTest {
 		);
 		assertEquals(0, parkingVisitRepository.count());
 		assertEquals(
-				ReservationStatus.ACTIVE,
+				secondsFromStart == 900 ? ReservationStatus.EXPIRED : ReservationStatus.ACTIVE,
 				reservationRepository.findById(reservation.getId()).orElseThrow().getStatus()
 		);
 	}

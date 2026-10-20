@@ -26,15 +26,16 @@ import java.util.Set;
 public class ReservationService {
 
 	private static final Duration HOLD_DURATION = Duration.ofMinutes(3);
+	private static final int NO_SHOW_BATCH_SIZE = 100;
 	private static final String SPOT_INTERVAL_CONSTRAINT = "ex_reservations_spot_interval";
 	private static final String VEHICLE_INTERVAL_CONSTRAINT = "ex_reservations_vehicle_interval";
 	private static final Set<ReservationStatus> PERSISTENT_BLOCKING_STATUSES = Set.of(
-			ReservationStatus.ACTIVE,
 			ReservationStatus.CHECKED_IN
 	);
 	private static final Set<ReservationStatus> CONFIRMED_HISTORY_STATUSES = Set.of(
 			ReservationStatus.ACTIVE,
 			ReservationStatus.CANCELLED,
+			ReservationStatus.EXPIRED,
 			ReservationStatus.CHECKED_IN,
 			ReservationStatus.COMPLETED
 	);
@@ -43,6 +44,7 @@ public class ReservationService {
 	private final ParkingSpotRepository parkingSpotRepository;
 	private final VehicleRepository vehicleRepository;
 	private final ParkingVisitRepository parkingVisitRepository;
+	private final ReservationEntryPolicy entryPolicy;
 	private final Clock clock;
 
 	public ReservationService(
@@ -50,12 +52,14 @@ public class ReservationService {
 			ParkingSpotRepository parkingSpotRepository,
 			VehicleRepository vehicleRepository,
 			ParkingVisitRepository parkingVisitRepository,
+			ReservationEntryPolicy entryPolicy,
 			Clock clock
 	) {
 		this.reservationRepository = reservationRepository;
 		this.parkingSpotRepository = parkingSpotRepository;
 		this.vehicleRepository = vehicleRepository;
 		this.parkingVisitRepository = parkingVisitRepository;
+		this.entryPolicy = entryPolicy;
 		this.clock = clock;
 	}
 
@@ -86,13 +90,21 @@ public class ReservationService {
 				.orElseThrow(() -> new VehicleNotFoundException(vehicleId));
 
 		reservationRepository.expireConflictingHolds(spotId, vehicleId, start, end, now);
+		reservationRepository.expireConflictingNoShows(
+				spotId,
+				vehicleId,
+				now,
+				entryPolicy.activeStartCutoff(now)
+		);
 		if (!reservationRepository.findBlockingConflicts(
 				spotId,
 				vehicleId,
 				start,
 				end,
 				now,
+				entryPolicy.activeStartCutoff(now),
 				ReservationStatus.HELD,
+				ReservationStatus.ACTIVE,
 				PERSISTENT_BLOCKING_STATUSES
 		).isEmpty()) {
 			throw new ReservationConflictException("Parking spot or vehicle is already reserved for this interval");
@@ -171,8 +183,10 @@ public class ReservationService {
 		);
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<ReservationEntity> getMyReservations(Long userId) {
+		Instant now = clock.instant();
+		reservationRepository.expireNoShowsForUser(userId, now, entryPolicy.activeStartCutoff(now));
 		return reservationRepository.findAllByUser_IdAndStatusInOrderByStartAtAscIdAsc(
 				userId,
 				CONFIRMED_HISTORY_STATUSES
@@ -201,6 +215,16 @@ public class ReservationService {
 	@Transactional
 	public int expireHolds() {
 		return reservationRepository.expireAllHolds(clock.instant());
+	}
+
+	@Transactional
+	public int expireNoShows() {
+		Instant now = clock.instant();
+		return reservationRepository.expireDueNoShows(
+				now,
+				entryPolicy.activeStartCutoff(now),
+				NO_SHOW_BATCH_SIZE
+		);
 	}
 
 	private ReservationEntity findOwnedForUpdate(Long reservationId, Long userId) {

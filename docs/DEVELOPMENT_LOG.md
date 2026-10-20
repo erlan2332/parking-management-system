@@ -201,3 +201,33 @@
 - Added focused PostgreSQL and MockMvc tests for snapshots, ownership, stable
   ordering, legacy visits, constraints, rollback, idempotent issue handling,
   and two independently transacted concurrent exits without timing sleeps.
+
+## Stage 09 — Reservation Automation and Email Reminders
+
+- Centralized the confirmed-booking entry deadline as
+  `min(endAt, startAt + 15 minutes)`. The same policy is used by barrier entry,
+  availability, hold creation, history refresh, and scheduled expiration, so
+  the exact boundary has one consistent half-open interpretation.
+- Added bounded PostgreSQL no-show cleanup with `FOR UPDATE SKIP LOCKED` and
+  status-guarded updates. Entry preserves the established spot, vehicle, then
+  reservation lock order and rereads locked state before creating a visit.
+- Kept logical expiration independent from scheduler timing. An overdue
+  `ACTIVE` booking stops blocking availability immediately, while hold creation
+  persists its `EXPIRED` state before relying on the existing exclusion
+  constraints. No-show expiration creates no visit, invoice, or charge.
+- Replaced the separate hold scheduler with one small configurable automation
+  coordinator. Temporary-hold rules are unchanged; the coordinator invokes
+  hold cleanup, no-show cleanup, and reminder processing every 30 seconds by
+  default.
+- Added a V7 PostgreSQL notification outbox with one
+  `RESERVATION_ENDING_SOON` row per reservation, constrained processing states,
+  attempt/error metadata, and indexes for safe claim and retry work.
+- Split reminder eligibility, transactional outbox state, message formatting,
+  and SMTP transport into focused components. SMTP calls happen outside the
+  database transaction and eligibility is rechecked immediately before send.
+- Made mail opt-in with validated environment configuration and finite network
+  timeouts. Tests and CI use an in-memory fake sender; no external mail service
+  or credential is required.
+- Documented the unavoidable SMTP acknowledgement gap: database uniqueness and
+  row claiming prevent normal concurrent duplicates, but a process failure
+  after SMTP acceptance and before the `SENT` commit can still cause a retry.
