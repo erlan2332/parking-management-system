@@ -19,6 +19,20 @@ application:
       secret-base64: ${JWT_SECRET_BASE64:}
       issuer: parking-management-system
       access-token-ttl: PT1H
+  reservations:
+    automation-delay: ${RESERVATION_AUTOMATION_DELAY:PT30S}
+  notifications:
+    mail:
+      enabled: ${MAIL_ENABLED:false}
+      host: ${MAIL_HOST:}
+      port: ${MAIL_PORT:587}
+      username: ${MAIL_USERNAME:}
+      password: ${MAIL_PASSWORD:}
+      from: ${MAIL_FROM:}
+      start-tls-enabled: ${MAIL_STARTTLS_ENABLED:false}
+      connect-timeout: ${MAIL_CONNECT_TIMEOUT:PT5S}
+      read-timeout: ${MAIL_READ_TIMEOUT:PT5S}
+      write-timeout: ${MAIL_WRITE_TIMEOUT:PT5S}
 
 parking:
   pricing:
