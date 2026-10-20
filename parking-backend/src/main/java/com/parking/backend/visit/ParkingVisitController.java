@@ -1,5 +1,8 @@
 package com.parking.backend.visit;
 
+import com.parking.backend.invoice.InvoiceEntity;
+import com.parking.backend.invoice.InvoiceService;
+import com.parking.backend.invoice.dto.InvoiceResponse;
 import com.parking.backend.pricing.ParkingCostBreakdown;
 import com.parking.backend.pricing.ParkingPricingService;
 import com.parking.backend.security.CurrentUserIdResolver;
@@ -20,15 +23,18 @@ public class ParkingVisitController {
 
 	private final ParkingVisitService parkingVisitService;
 	private final ParkingPricingService parkingPricingService;
+	private final InvoiceService invoiceService;
 	private final CurrentUserIdResolver currentUserIdResolver;
 
 	public ParkingVisitController(
 			ParkingVisitService parkingVisitService,
 			ParkingPricingService parkingPricingService,
+			InvoiceService invoiceService,
 			CurrentUserIdResolver currentUserIdResolver
 	) {
 		this.parkingVisitService = parkingVisitService;
 		this.parkingPricingService = parkingPricingService;
+		this.invoiceService = invoiceService;
 		this.currentUserIdResolver = currentUserIdResolver;
 	}
 
@@ -47,7 +53,16 @@ public class ParkingVisitController {
 	) {
 		Long userId = currentUserIdResolver.resolve(jwt);
 		ParkingVisitEntity visit = parkingVisitService.getCompletedVisit(id, userId);
-		ParkingCostBreakdown cost = parkingPricingService.calculate(visit.getEnteredAt(), visit.getExitedAt());
+		ParkingCostBreakdown cost = invoiceService.findByVisitId(visit.getId())
+				.map(InvoiceEntity::toCostBreakdown)
+				.orElseGet(() -> parkingPricingService.calculate(visit.getEnteredAt(), visit.getExitedAt()));
 		return ParkingVisitCostResponse.from(visit, cost);
+	}
+
+	@GetMapping("/{id}/invoice")
+	public InvoiceResponse getVisitInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+		Long userId = currentUserIdResolver.resolve(jwt);
+		parkingVisitService.getCompletedVisit(id, userId);
+		return InvoiceResponse.from(invoiceService.getOwnedInvoiceForVisit(id, userId));
 	}
 }
