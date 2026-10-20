@@ -2,6 +2,7 @@ package com.parking.backend.parking;
 
 import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
+import com.parking.backend.reservation.ReservationEntryPolicy;
 import com.parking.backend.reservation.ReservationRepository;
 import com.parking.backend.reservation.ReservationStatus;
 import com.parking.backend.visit.ParkingVisitRepository;
@@ -49,6 +50,7 @@ class ParkingSpotServiceTest {
 				parkingSpotRepository,
 				reservationRepository,
 				parkingVisitRepository,
+				new ReservationEntryPolicy(),
 				clock
 		);
 	}
@@ -148,7 +150,9 @@ class ParkingSpotServiceTest {
 				any(),
 				any(),
 				any(),
+				any(),
 				eq(ReservationStatus.HELD),
+				eq(ReservationStatus.ACTIVE),
 				anyCollection()
 		)).thenReturn(List.of());
 		when(parkingVisitRepository.findAllByExitedAtIsNull()).thenReturn(List.of());

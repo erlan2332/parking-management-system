@@ -143,6 +143,7 @@ class ReservationServiceTest {
 				parkingSpotRepository,
 				vehicleRepository,
 				parkingVisitRepository,
+				new ReservationEntryPolicy(),
 				Clock.fixed(instant, ZoneOffset.UTC)
 		);
 	}
@@ -157,6 +158,8 @@ class ReservationServiceTest {
 				any(),
 				any(),
 				any(),
+				any(ReservationStatus.class),
+				any(ReservationStatus.class),
 				anyCollection()
 		)).thenReturn(List.of());
 		when(reservationRepository.saveAndFlush(any(ReservationEntity.class)))
