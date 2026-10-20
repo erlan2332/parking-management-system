@@ -21,6 +21,9 @@ application:
       access-token-ttl: PT1H
   reservations:
     automation-delay: ${RESERVATION_AUTOMATION_DELAY:PT30S}
+  realtime:
+    websocket:
+      allowed-origins: ${PARKING_WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
   notifications:
     mail:
       enabled: ${MAIL_ENABLED:false}
