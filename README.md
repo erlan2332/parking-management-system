@@ -22,15 +22,14 @@ Flyway manages parking spots, users, vehicles, and reservations. Drivers can
 register, log in, receive a 60-minute JWT access token, manage their vehicles,
 hold a parking spot for three minutes, and confirm or cancel a reservation
 through a secured REST API. The barrier simulator supports reservation and
-walk-in entry, physical exit, and visit history. The frontend is not
-implemented yet.
+walk-in entry, physical exit, and visit history. Completed visits can be priced
+with configurable day and night rates. The frontend is not implemented yet.
 
 ## Planned Features
 
 - Driver profiles and vehicles
 - Parking spot management
-- Day and night tariffs
-- Visit and invoice history
+- Invoice and payment history
 - WebSocket real-time updates
 - Email notifications
 
@@ -63,6 +62,12 @@ export DB_PASSWORD='choose_a_local_password'
 openssl rand -base64 32
 export JWT_SECRET_BASE64='paste_the_generated_value_here'
 
+export PARKING_PRICING_ZONE_ID='Asia/Bishkek'
+export PARKING_DAY_START='08:00'
+export PARKING_DAY_END='20:00'
+export PARKING_DAY_RATE_PER_MINUTE='2.00'
+export PARKING_NIGHT_RATE_PER_MINUTE='1.00'
+
 export TEST_DB_URL='jdbc:postgresql://localhost:5432/parking_test_db'
 export TEST_DB_USERNAME='parking_user'
 export TEST_DB_PASSWORD='choose_a_local_password'
@@ -75,6 +80,11 @@ separate `TEST_DB_*` connection and never point to `parking_db` by default.
 secret across restarts if previously issued access tokens should remain valid.
 The committed test profile contains only an isolated test key; production and
 local runtime configuration never fall back to it.
+
+Pricing defaults to `Asia/Bishkek`, a half-open day period of `[08:00, 20:00)`,
+`2.00 KGS` per day minute, and `1.00 KGS` per night minute. The five
+`PARKING_*` variables above override the zone, boundaries, and rates. Rates
+must be zero or positive, and the day start must be earlier than the day end.
 
 ### Build and run
 
@@ -140,6 +150,7 @@ The remaining endpoints require `Authorization: Bearer <access-token>`:
 - `POST /api/barrier/entry`
 - `POST /api/barrier/exit`
 - `GET /api/visits/my`
+- `GET /api/visits/{id}/cost`
 
 JWT access tokens expire after 60 minutes. There is no refresh-token or logout
 API in the current stage.
@@ -226,9 +237,40 @@ curl -sS -X POST 'http://localhost:8080/api/barrier/exit' \
   -d '{"plateNumber":"01KG123ABC"}'
 ```
 
-This stage does not calculate fees, create invoices, expire no-show
+This stage does not create invoices, require payment for exit, expire no-show
 reservations automatically, send live WebSocket updates, or control physical
 barrier hardware.
+
+### Parking pricing
+
+`GET /api/visits/{id}/cost` calculates a detailed price only for a completed
+visit owned by the authenticated driver. Active visits return a conflict
+because their final duration is unknown; missing and foreign visits share the
+same not-found response. The calculation uses the persisted actual entry and
+exit instants for both reservation and walk-in visits.
+
+Tariff selection always uses the configured parking zone, `Asia/Bishkek` by
+default, rather than the host system zone or the offsets originally used to
+write a timestamp. Every visit is split at `08:00`, `20:00`, and midnight for
+each local calendar day. For example, a visit from `19:30` to `20:30` contains
+30 day minutes and 30 night minutes and costs `90.00 KGS` with the default
+rates.
+
+Partial minutes are proportional to actual whole seconds:
+`segmentSeconds × ratePerMinute / 60`. Segment values are accumulated before
+the total is rounded to two decimal places with `HALF_UP`; a 30-second day
+visit therefore costs `1.00 KGS`. The response includes total/day/night
+seconds, both rates, both cost components, total cost, and currency `KGS`.
+
+```bash
+curl -sS "http://localhost:8080/api/visits/$VISIT_ID/cost" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Stage 07 calculates with the current configuration and does not persist a
+charge. Recalculating an old visit after a rate change can therefore produce a
+different result. A later invoice stage must snapshot the applied rates and
+amount; no tariff versioning, invoice, or payment state is introduced here.
 
 ## Continuous Integration
 
@@ -243,12 +285,12 @@ container and its data are removed automatically when the job finishes. JWT
 secrets are generated for each workflow run and are not stored in the
 repository.
 
-The workflow assembles the Spring Boot JAR and runs 16 tagged smoke tests for
+The workflow assembles the Spring Boot JAR and runs 17 tagged smoke tests for
 application startup and Flyway, registration and login, JWT protection,
 vehicle creation and ownership, duplicate handling, parking spot listing, and
 availability validation, reservation lifecycle, concurrent hold protection,
-reservation entry/exit, and concurrent walk-in allocation. The check appears
-in a pull request as
+reservation entry/exit, concurrent walk-in allocation, and pricing across the
+day/night boundary. The check appears in a pull request as
 `Backend CI / Build and Smoke Tests`. If the job fails, its Checks page contains
 the logs and a downloadable `backend-smoke-test-reports-*` artifact with the
 JUnit/Gradle reports, retained for seven days.
