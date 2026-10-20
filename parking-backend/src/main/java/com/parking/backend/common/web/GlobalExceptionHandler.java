@@ -3,8 +3,10 @@ package com.parking.backend.common.web;
 import com.parking.backend.common.exception.DuplicateVehiclePlateException;
 import com.parking.backend.common.exception.EmailAlreadyExistsException;
 import com.parking.backend.common.exception.InvalidCredentialsException;
+import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.InvalidPasswordException;
 import com.parking.backend.common.exception.InvalidPlateNumberException;
+import com.parking.backend.common.exception.ParkingSpotNotFoundException;
 import com.parking.backend.common.exception.UserNotFoundException;
 import com.parking.backend.common.exception.VehicleNotFoundException;
 import org.slf4j.Logger;
@@ -14,9 +16,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -35,6 +39,29 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ApiErrorResponse> handleUnreadableRequest() {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body is invalid");
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ResponseEntity<ApiErrorResponse> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
+		return error(
+				HttpStatus.BAD_REQUEST,
+				"INVALID_REQUEST",
+				"Required query parameter is missing: " + exception.getParameterName()
+		);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ApiErrorResponse> handleInvalidRequestParameter(MethodArgumentTypeMismatchException exception) {
+		return error(
+				HttpStatus.BAD_REQUEST,
+				"INVALID_REQUEST",
+				"Query parameter has an invalid value: " + exception.getName()
+		);
+	}
+
+	@ExceptionHandler(InvalidParkingIntervalException.class)
+	ResponseEntity<ApiErrorResponse> handleInvalidParkingInterval(InvalidParkingIntervalException exception) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PARKING_INTERVAL", exception.getMessage());
 	}
 
 	@ExceptionHandler(InvalidPlateNumberException.class)
@@ -70,6 +97,11 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(VehicleNotFoundException.class)
 	ResponseEntity<ApiErrorResponse> handleVehicleNotFound() {
 		return error(HttpStatus.NOT_FOUND, "VEHICLE_NOT_FOUND", "Vehicle was not found");
+	}
+
+	@ExceptionHandler(ParkingSpotNotFoundException.class)
+	ResponseEntity<ApiErrorResponse> handleParkingSpotNotFound() {
+		return error(HttpStatus.NOT_FOUND, "PARKING_SPOT_NOT_FOUND", "Parking spot was not found");
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)

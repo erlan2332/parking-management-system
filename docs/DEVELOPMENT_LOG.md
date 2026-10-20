@@ -57,3 +57,24 @@
   conflict responses without exposing SQL or framework details.
 - Added unit tests plus PostgreSQL/MockMvc integration tests with active
   security filters, including concurrent registration and invalid JWT cases.
+
+## Stage 04 — Parking Spots and Availability
+
+- Mapped the existing `parking_spots` table without changing Flyway V1-V3 and
+  added a repository query that returns the seeded codes in natural order:
+  `A1`-`A10`, then `B1`-`B10`.
+- Kept operational activity separate from occupancy. Active spots currently
+  resolve to `FREE`, inactive spots to `UNAVAILABLE`; `RESERVED` and
+  `OCCUPIED` remain computed future states backed by real reservations and
+  visits rather than new database columns or placeholder data.
+- Added secured DTO-based endpoints for listing spots, reading one spot, and
+  checking all spots for a requested interval. No persistence entity is
+  exposed by the HTTP layer.
+- Modelled request boundaries with `OffsetDateTime` and compare their instants,
+  so offsets are handled correctly. Intervals are validated as non-empty
+  half-open ranges `[startAt, endAt)`.
+- Availability currently reflects the only relevant persisted fact:
+  `active`. The service owns this rule so reservation overlap and active-visit
+  checks can be added there in later stages without changing the API shape.
+- Added unit, PostgreSQL-backed persistence/Flyway, and secured MockMvc tests,
+  while retaining the existing uniform API error format.
