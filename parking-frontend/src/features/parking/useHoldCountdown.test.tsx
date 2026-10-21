@@ -4,7 +4,7 @@ import { useHoldCountdown } from './useHoldCountdown'
 
 function Countdown({ deadline }: { deadline: string }) {
   const countdown = useHoldCountdown(deadline)
-  return <span>{countdown.label}:{String(countdown.expired)}</span>
+  return <span>{countdown.label}:{String(countdown.expired)}:{Math.round(countdown.progressPercent)}</span>
 }
 
 describe('useHoldCountdown', () => {
@@ -14,8 +14,8 @@ describe('useHoldCountdown', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-21T10:00:00Z'))
     render(<Countdown deadline="2026-10-21T10:02:00Z" />)
-    expect(screen.getByText('02:00:false')).toBeInTheDocument()
+    expect(screen.getByText('02:00:false:67')).toBeInTheDocument()
     act(() => vi.advanceTimersByTime(121_000))
-    expect(screen.getByText('00:00:true')).toBeInTheDocument()
+    expect(screen.getByText('00:00:true:0')).toBeInTheDocument()
   })
 })

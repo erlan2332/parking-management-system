@@ -60,7 +60,7 @@ export function BarrierPage() {
           <h2 className="text-lg font-bold">Результат операции</h2>
           {!result ? <div className="state-panel"><CarFront className="size-8 text-slate-400" /><span>Выберите автомобиль и выполните въезд или выезд.</span></div> : (
             <div className="mt-5 grid gap-5">
-              <div className="rounded-2xl bg-emerald-50 p-5 text-emerald-900"><p className="font-bold">Шлагбаум открыт</p><p className="mt-1 text-sm">Операция успешно сохранена сервером.</p></div>
+              <div className="rounded-2xl bg-emerald-50 p-5 font-bold text-emerald-900">Шлагбаум открыт</div>
               <dl className="grid gap-4 sm:grid-cols-2">
                 <div><dt className="text-sm text-slate-500">Автомобиль</dt><dd className="mt-1 font-semibold">{result.plateNumber}</dd></div>
                 <div><dt className="text-sm text-slate-500">Место</dt><dd className="mt-1 flex items-center gap-2 font-semibold"><MapPin className="size-4" /> {result.spotCode}</dd></div>

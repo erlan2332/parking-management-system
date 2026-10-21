@@ -120,24 +120,6 @@ export function ParkingPage() {
         {activeHold ? <p className="mt-4 flex items-center gap-2 text-sm text-amber-700"><Info className="size-4" /> Завершите текущее удержание, прежде чем менять автомобиль или время.</p> : null}
       </Card>
 
-      {activeHold ? (
-        <HoldPanel
-          hold={activeHold}
-          vehicle={holdVehicle}
-          confirming={confirmMutation.isPending}
-          releasing={releaseMutation.isPending}
-          onConfirm={() => confirmMutation.mutate()}
-          onRelease={() => releaseMutation.mutate()}
-          onExpired={handleExpired}
-        />
-      ) : null}
-      {notice ? <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800" role="status">{notice}</p> : null}
-      {holdMutation.isError || confirmMutation.isError || releaseMutation.isError ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
-          {getErrorMessage(holdMutation.error ?? confirmMutation.error ?? releaseMutation.error, 'Не удалось выполнить действие с бронированием.')}
-        </p>
-      ) : null}
-
       <Card>
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <h2 className="text-lg font-bold">Схема парковки</h2>
@@ -150,6 +132,24 @@ export function ParkingPage() {
         {!intervalError && availability.isError ? <ErrorState message={getErrorMessage(availability.error, 'Не удалось загрузить парковочные места.')} onRetry={() => availability.refetch()} /> : null}
         {availability.data ? <ParkingMap spots={availability.data.spots} onSelect={selectSpot} pendingSpotId={holdMutation.isPending ? holdMutation.variables?.id : undefined} /> : null}
       </Card>
+
+      {notice ? <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800" role="status">{notice}</p> : null}
+      {holdMutation.isError || confirmMutation.isError || releaseMutation.isError ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          {getErrorMessage(holdMutation.error ?? confirmMutation.error ?? releaseMutation.error, 'Не удалось выполнить действие с бронированием.')}
+        </p>
+      ) : null}
+      {activeHold ? (
+        <HoldPanel
+          hold={activeHold}
+          vehicle={holdVehicle}
+          confirming={confirmMutation.isPending}
+          releasing={releaseMutation.isPending}
+          onConfirm={() => confirmMutation.mutate()}
+          onRelease={() => releaseMutation.mutate()}
+          onExpired={handleExpired}
+        />
+      ) : null}
     </div>
   )
 }

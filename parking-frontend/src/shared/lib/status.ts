@@ -4,7 +4,7 @@ export const parkingStatusLabels: Record<ParkingSpotStatus, string> = {
   FREE: 'Свободно',
   HELD: 'Временно удерживается',
   RESERVED: 'Забронировано',
-  OCCUPIED: 'Занято автомобилем',
+  OCCUPIED: 'Занято',
   UNAVAILABLE: 'Недоступно',
 }
 
