@@ -27,14 +27,15 @@ visit and issues an invoice that preserves the applied day/night rates and
 amount. Drivers can review their invoice history through secured REST APIs.
 Confirmed reservations expire automatically after a missed entry window, and
 checked-in drivers can receive one ending-soon email reminder when SMTP is
-enabled. The frontend is not implemented yet.
+enabled. Authenticated STOMP clients receive real-time parking availability
+change notifications and then refresh their selected interval through REST.
+The frontend is not implemented yet.
 
 ## Planned Features
 
 - Driver profiles and vehicles
 - Parking spot management
 - Payments and payment history
-- WebSocket real-time updates
 
 ## Local Development
 
@@ -72,6 +73,7 @@ export PARKING_DAY_RATE_PER_MINUTE='2.00'
 export PARKING_NIGHT_RATE_PER_MINUTE='1.00'
 
 export RESERVATION_AUTOMATION_DELAY='PT30S'
+export PARKING_WEBSOCKET_ALLOWED_ORIGINS='http://localhost:5173'
 export MAIL_ENABLED='false'
 
 export TEST_DB_URL='jdbc:postgresql://localhost:5432/parking_test_db'
@@ -94,6 +96,11 @@ must be zero or positive, and the day start must be earlier than the day end.
 Reservation automation runs every 30 seconds by default. Email is disabled by
 default, so cleanup, registration, reservations, the barrier, and invoices run
 without an SMTP server.
+
+The WebSocket handshake accepts only origins listed in
+`PARKING_WEBSOCKET_ALLOWED_ORIGINS` (comma-separated when several are needed).
+Local development defaults to `http://localhost:5173`; wildcard origins are
+rejected and no production domain is assumed.
 
 ### Build and run
 
@@ -264,8 +271,8 @@ curl -sS -X POST 'http://localhost:8080/api/barrier/exit' \
   -d '{"plateNumber":"01KG123ABC"}'
 ```
 
-Exit does not require or simulate payment. Live WebSocket updates and control
-of physical barrier hardware remain outside the current stage.
+Exit does not require or simulate payment. Control of physical barrier
+hardware remains outside the current stage.
 
 ### Reservation automation and email reminders
 
@@ -316,6 +323,77 @@ cd parking-backend
 ./gradlew test --tests '*ReservationAutomationIntegrationTest' \
   --tests '*ReservationReminderIntegrationTest'
 ```
+
+### Real-time parking updates
+
+The backend exposes a native WebSocket endpoint at `/ws/parking`, speaks STOMP,
+and uses the built-in single-instance simple broker. A browser performs the
+HTTP upgrade from an allowed Origin, sends `Authorization: Bearer <JWT>` in the
+STOMP `CONNECT` headers, and subscribes to `/topic/parking/changes`. The token
+is decoded by the same `JwtDecoder` as REST, including signature, expiration,
+issuer, and positive user-ID subject checks. Tokens are never accepted in the
+URL. Anonymous or invalid connections, subscriptions to other destinations,
+and every client `SEND` command are rejected.
+
+Successful state changes produce a minimal event after the PostgreSQL
+transaction commits:
+
+```json
+{
+  "type": "PARKING_AVAILABILITY_CHANGED",
+  "reason": "HOLD_CREATED",
+  "spotId": 2,
+  "spotCode": "A2",
+  "occurredAt": "2026-12-01T13:30:00+06:00"
+}
+```
+
+Supported reasons are `HOLD_CREATED`, `HOLD_RELEASED`, `HOLD_EXPIRED`,
+`RESERVATION_CONFIRMED`, `RESERVATION_CANCELLED`, `RESERVATION_EXPIRED`,
+`VEHICLE_ENTERED`, and `VEHICLE_EXITED`. The public topic contains no user,
+vehicle, invoice, email, or token data. A rollback produces no message, and a
+broker failure cannot roll back an already committed hold, visit, or invoice.
+
+An event is only an invalidation hint because availability depends on the
+client's interval. After connecting, and after every event, a future React
+client should call `GET /api/parking/availability?startAt=...&endAt=...` for
+its current interval. Frequent notifications should be debounced into a small
+number of refreshes, and an older HTTP response must not overwrite newer data.
+PostgreSQL constraints and service transactions—not the event—remain the
+authority for a hold attempt.
+
+Temporary holds become logically ineffective at `holdExpiresAt`; the scheduled
+`HOLD_EXPIRED` event may arrive up to one automation interval later. A client
+should keep its server-provided deadline and still refresh availability. After
+a disconnect, browser sleep, server restart, or JWT expiration, reconnect with
+a valid token, resubscribe, and perform a full REST refresh. Reconnection does
+not extend a hold or replay missed events.
+
+For a future STOMP.js client, the essential setup is:
+
+```javascript
+const client = new Client({
+  brokerURL: "ws://localhost:8080/ws/parking",
+  connectHeaders: { Authorization: `Bearer ${token}` },
+  onConnect: () => client.subscribe("/topic/parking/changes", refreshAvailability)
+});
+client.activate();
+```
+
+The real integration test opens two authenticated STOMP clients, subscribes
+both, creates and confirms a hold, receives both events, and verifies `HELD`
+then `RESERVED` through the existing availability service. It also covers
+Origin and JWT rejection without using arbitrary sleeps:
+
+```bash
+cd parking-backend
+./gradlew test --tests '*ParkingRealtimeIntegrationTest'
+```
+
+The simple broker is intentionally non-durable: disconnected clients can miss
+events, and separate backend instances do not exchange them. Horizontal
+deployment would require a shared broker or another distribution mechanism;
+neither event persistence nor an external broker is introduced in this stage.
 
 ### Parking pricing
 
@@ -387,15 +465,16 @@ container and its data are removed automatically when the job finishes. JWT
 secrets are generated for each workflow run and are not stored in the
 repository.
 
-The workflow assembles the Spring Boot JAR and runs 21 tagged smoke tests for
+The workflow assembles the Spring Boot JAR and runs 22 tagged smoke tests for
 application startup and Flyway, registration and login, JWT protection,
 vehicle creation and ownership, duplicate handling, parking spot listing, and
 availability validation, reservation lifecycle, concurrent hold protection,
 reservation entry/exit, concurrent walk-in allocation, and pricing across the
 day/night boundary, automatic invoice issuance, and concurrent double-charge
 protection. It also covers exact-boundary no-show expiration and one-time email
-reminder processing through a fake transport. The check appears in a pull
-request as
+reminder processing through a fake transport, plus real delivery of hold and
+confirmation events to two JWT-authenticated STOMP clients. The check appears
+in a pull request as
 `Backend CI / Build and Smoke Tests`. If the job fails, its Checks page contains
 the logs and a downloadable `backend-smoke-test-reports-*` artifact with the
 JUnit/Gradle reports, retained for seven days.
