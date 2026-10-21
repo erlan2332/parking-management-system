@@ -16,12 +16,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Objects;
 
 @Entity
 @Table(name = "reservations")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReservationEntity {
 
 	@Id
@@ -62,9 +67,6 @@ public class ReservationEntity {
 	@Column(name = "cancelled_at")
 	private Instant cancelledAt;
 
-	protected ReservationEntity() {
-	}
-
 	private ReservationEntity(
 			UserEntity user,
 			VehicleEntity vehicle,
@@ -94,50 +96,6 @@ public class ReservationEntity {
 			Instant createdAt
 	) {
 		return new ReservationEntity(user, vehicle, spot, startAt, endAt, holdExpiresAt, createdAt);
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public UserEntity getUser() {
-		return user;
-	}
-
-	public VehicleEntity getVehicle() {
-		return vehicle;
-	}
-
-	public ParkingSpotEntity getSpot() {
-		return spot;
-	}
-
-	public Instant getStartAt() {
-		return startAt;
-	}
-
-	public Instant getEndAt() {
-		return endAt;
-	}
-
-	public ReservationStatus getStatus() {
-		return status;
-	}
-
-	public Instant getHoldExpiresAt() {
-		return holdExpiresAt;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
-	}
-
-	public Instant getConfirmedAt() {
-		return confirmedAt;
-	}
-
-	public Instant getCancelledAt() {
-		return cancelledAt;
 	}
 
 	public boolean isExpiredHoldAt(Instant now) {

@@ -1,6 +1,7 @@
 package com.parking.backend.realtime.security;
 
 import com.parking.backend.realtime.config.ParkingWebSocketConfig;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -20,15 +21,12 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class ParkingStompChannelInterceptor implements ChannelInterceptor {
 
 	private static final String BEARER_PREFIX = "Bearer ";
 
 	private final JwtDecoder jwtDecoder;
-
-	public ParkingStompChannelInterceptor(JwtDecoder jwtDecoder) {
-		this.jwtDecoder = jwtDecoder;
-	}
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {

@@ -17,12 +17,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Objects;
 
 @Entity
 @Table(name = "parking_visits")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ParkingVisitEntity {
 
 	@Id
@@ -53,9 +58,6 @@ public class ParkingVisitEntity {
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
-
-	protected ParkingVisitEntity() {
-	}
 
 	private ParkingVisitEntity(
 			VehicleEntity vehicle,
@@ -93,38 +95,6 @@ public class ParkingVisitEntity {
 			Instant enteredAt
 	) {
 		return new ParkingVisitEntity(vehicle, spot, null, ParkingEntryType.WALK_IN, enteredAt);
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public VehicleEntity getVehicle() {
-		return vehicle;
-	}
-
-	public ParkingSpotEntity getSpot() {
-		return spot;
-	}
-
-	public ReservationEntity getReservation() {
-		return reservation;
-	}
-
-	public ParkingEntryType getEntryType() {
-		return entryType;
-	}
-
-	public Instant getEnteredAt() {
-		return enteredAt;
-	}
-
-	public Instant getExitedAt() {
-		return exitedAt;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
 	}
 
 	public ParkingVisitStatus getStatus() {

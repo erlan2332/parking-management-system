@@ -2,6 +2,7 @@ package com.parking.backend.notification.service;
 
 import com.parking.backend.notification.model.ClaimedReservationReminder;
 import com.parking.backend.notification.sender.ReservationEmailSender;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ReservationReminderService {
 
 	private static final int PROCESSING_BATCH_SIZE = 20;
@@ -21,18 +23,6 @@ public class ReservationReminderService {
 	private final ReservationEmailSender emailSender;
 	private final ReservationReminderMessageFactory messageFactory;
 	private final Clock clock;
-
-	public ReservationReminderService(
-			ReservationNotificationStore notificationStore,
-			ReservationEmailSender emailSender,
-			ReservationReminderMessageFactory messageFactory,
-			Clock clock
-	) {
-		this.notificationStore = notificationStore;
-		this.emailSender = emailSender;
-		this.messageFactory = messageFactory;
-		this.clock = clock;
-	}
 
 	public int processDueReminders() {
 		if (!emailSender.isEnabled()) {

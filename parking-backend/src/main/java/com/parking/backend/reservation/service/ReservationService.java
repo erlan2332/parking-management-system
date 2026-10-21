@@ -18,6 +18,7 @@ import com.parking.backend.realtime.event.ParkingChangeReason;
 import com.parking.backend.vehicle.entity.VehicleEntity;
 import com.parking.backend.vehicle.repository.VehicleRepository;
 import com.parking.backend.visit.repository.ParkingVisitRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 public class ReservationService {
 
 	private static final Duration HOLD_DURATION = Duration.ofMinutes(3);
@@ -55,24 +57,6 @@ public class ReservationService {
 	private final ReservationEntryPolicy entryPolicy;
 	private final ParkingChangePublisher changePublisher;
 	private final Clock clock;
-
-	public ReservationService(
-			ReservationRepository reservationRepository,
-			ParkingSpotRepository parkingSpotRepository,
-			VehicleRepository vehicleRepository,
-			ParkingVisitRepository parkingVisitRepository,
-			ReservationEntryPolicy entryPolicy,
-			ParkingChangePublisher changePublisher,
-			Clock clock
-	) {
-		this.reservationRepository = reservationRepository;
-		this.parkingSpotRepository = parkingSpotRepository;
-		this.vehicleRepository = vehicleRepository;
-		this.parkingVisitRepository = parkingVisitRepository;
-		this.entryPolicy = entryPolicy;
-		this.changePublisher = changePublisher;
-		this.clock = clock;
-	}
 
 	@Transactional
 	public ReservationEntity createHold(

@@ -6,11 +6,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 
 @Entity
 @Table(name = "parking_spots")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ParkingSpotEntity {
 
 	@Id
@@ -23,24 +28,9 @@ public class ParkingSpotEntity {
 	@Column(name = "active", nullable = false)
 	private boolean active;
 
-	protected ParkingSpotEntity() {
-	}
-
 	public ParkingSpotEntity(String code, boolean active) {
 		this.code = requireNonBlank(code);
 		this.active = active;
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public String getCode() {
-		return code;
-	}
-
-	public boolean isActive() {
-		return active;
 	}
 
 	private static String requireNonBlank(String code) {

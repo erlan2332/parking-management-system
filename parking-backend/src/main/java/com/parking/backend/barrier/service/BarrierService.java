@@ -26,6 +26,7 @@ import com.parking.backend.vehicle.repository.VehicleRepository;
 import com.parking.backend.visit.entity.ParkingVisitEntity;
 import com.parking.backend.visit.model.ParkingVisitLockTarget;
 import com.parking.backend.visit.repository.ParkingVisitRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 public class BarrierService {
 
 	private static final String ACTIVE_VEHICLE_CONSTRAINT = "uk_parking_visits_active_vehicle";
@@ -54,28 +56,6 @@ public class BarrierService {
 	private final ReservationEntryPolicy entryPolicy;
 	private final ParkingChangePublisher changePublisher;
 	private final Clock clock;
-
-	public BarrierService(
-			PlateNormalizer plateNormalizer,
-			VehicleRepository vehicleRepository,
-			ParkingSpotRepository parkingSpotRepository,
-			ReservationRepository reservationRepository,
-			ParkingVisitRepository parkingVisitRepository,
-			InvoiceService invoiceService,
-			ReservationEntryPolicy entryPolicy,
-			ParkingChangePublisher changePublisher,
-			Clock clock
-	) {
-		this.plateNormalizer = plateNormalizer;
-		this.vehicleRepository = vehicleRepository;
-		this.parkingSpotRepository = parkingSpotRepository;
-		this.reservationRepository = reservationRepository;
-		this.parkingVisitRepository = parkingVisitRepository;
-		this.invoiceService = invoiceService;
-		this.entryPolicy = entryPolicy;
-		this.changePublisher = changePublisher;
-		this.clock = clock;
-	}
 
 	@Transactional(noRollbackFor = ReservationNoShowExpiredException.class)
 	public ParkingVisitEntity enter(Long userId, String plateNumber) {

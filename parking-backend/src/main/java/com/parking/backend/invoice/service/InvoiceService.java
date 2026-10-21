@@ -10,6 +10,7 @@ import com.parking.backend.common.persistence.DatabaseConstraintViolationDetecto
 import com.parking.backend.pricing.model.ParkingCostBreakdown;
 import com.parking.backend.pricing.service.ParkingPricingService;
 import com.parking.backend.visit.entity.ParkingVisitEntity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,17 +21,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class InvoiceService {
 
 	private static final String UNIQUE_VISIT_CONSTRAINT = "uk_invoices_visit";
 
 	private final InvoiceRepository invoiceRepository;
 	private final ParkingPricingService parkingPricingService;
-
-	public InvoiceService(InvoiceRepository invoiceRepository, ParkingPricingService parkingPricingService) {
-		this.invoiceRepository = invoiceRepository;
-		this.parkingPricingService = parkingPricingService;
-	}
 
 	@Transactional(propagation = Propagation.MANDATORY)
 	public InvoiceEntity issueForVisit(ParkingVisitEntity visit, Instant issuedAt) {

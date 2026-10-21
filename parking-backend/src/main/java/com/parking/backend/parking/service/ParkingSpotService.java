@@ -14,6 +14,7 @@ import com.parking.backend.reservation.repository.ReservationRepository;
 import com.parking.backend.reservation.model.ReservationStatus;
 import com.parking.backend.visit.entity.ParkingVisitEntity;
 import com.parking.backend.visit.repository.ParkingVisitRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ParkingSpotService {
 
 	private static final Set<ReservationStatus> PERSISTENT_BLOCKING_STATUSES = Set.of(
@@ -39,20 +41,6 @@ public class ParkingSpotService {
 	private final ParkingVisitRepository parkingVisitRepository;
 	private final ReservationEntryPolicy entryPolicy;
 	private final Clock clock;
-
-	public ParkingSpotService(
-			ParkingSpotRepository parkingSpotRepository,
-			ReservationRepository reservationRepository,
-			ParkingVisitRepository parkingVisitRepository,
-			ReservationEntryPolicy entryPolicy,
-			Clock clock
-	) {
-		this.parkingSpotRepository = parkingSpotRepository;
-		this.reservationRepository = reservationRepository;
-		this.parkingVisitRepository = parkingVisitRepository;
-		this.entryPolicy = entryPolicy;
-		this.clock = clock;
-	}
 
 	@Transactional(readOnly = true)
 	public List<ParkingSpotEntity> getAllSpots() {

@@ -6,6 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 
@@ -13,6 +16,8 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "users")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserEntity {
 
 	@Id
@@ -29,28 +34,9 @@ public class UserEntity {
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
-	protected UserEntity() {
-	}
-
 	public UserEntity(String email, String passwordHash) {
 		this.email = requireNonBlank(email, "Email").strip();
 		this.passwordHash = requireNonBlank(passwordHash, "Password hash");
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public String getEmail() {
-		return email;
-	}
-
-	public String getPasswordHash() {
-		return passwordHash;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
 	}
 
 	private static String requireNonBlank(String value, String fieldName) {

@@ -1,6 +1,7 @@
 package com.parking.backend.realtime.config;
 
 import com.parking.backend.realtime.security.ParkingStompChannelInterceptor;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Configuration(proxyBeanMethods = false)
 @EnableWebSocketMessageBroker
 @EnableConfigurationProperties(ParkingWebSocketProperties.class)
+@RequiredArgsConstructor
 public class ParkingWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	public static final String ENDPOINT = "/ws/parking";
@@ -20,14 +22,6 @@ public class ParkingWebSocketConfig implements WebSocketMessageBrokerConfigurer 
 
 	private final ParkingWebSocketProperties properties;
 	private final ParkingStompChannelInterceptor channelInterceptor;
-
-	public ParkingWebSocketConfig(
-			ParkingWebSocketProperties properties,
-			ParkingStompChannelInterceptor channelInterceptor
-	) {
-		this.properties = properties;
-		this.channelInterceptor = channelInterceptor;
-	}
 
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {

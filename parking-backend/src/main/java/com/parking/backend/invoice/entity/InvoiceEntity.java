@@ -15,6 +15,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,6 +26,8 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "invoices")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InvoiceEntity {
 
 	@Id
@@ -82,9 +87,6 @@ public class InvoiceEntity {
 	@Column(name = "total_amount", nullable = false, updatable = false, precision = 19, scale = 2)
 	private BigDecimal totalAmount;
 
-	protected InvoiceEntity() {
-	}
-
 	private InvoiceEntity(ParkingVisitEntity visit, ParkingCostBreakdown cost, Instant issuedAt) {
 		this.visit = Objects.requireNonNull(visit, "Parking visit must not be null");
 		this.issuedAt = Objects.requireNonNull(issuedAt, "Issue time must not be null");
@@ -113,82 +115,9 @@ public class InvoiceEntity {
 		return new InvoiceEntity(visit, cost, issuedAt);
 	}
 
-	public Long getId() {
-		return id;
-	}
-
 	public String getInvoiceNumber() {
 		return String.format(Locale.ROOT, "INV-%08d", id);
 	}
-
-	public ParkingVisitEntity getVisit() {
-		return visit;
-	}
-
-	public InvoiceStatus getStatus() {
-		return status;
-	}
-
-	public Instant getIssuedAt() {
-		return issuedAt;
-	}
-
-	public Instant getEnteredAt() {
-		return enteredAt;
-	}
-
-	public Instant getExitedAt() {
-		return exitedAt;
-	}
-
-	public String getVehiclePlate() {
-		return vehiclePlate;
-	}
-
-	public String getSpotCode() {
-		return spotCode;
-	}
-
-	public String getPricingZoneId() {
-		return pricingZoneId;
-	}
-
-	public String getCurrency() {
-		return currency;
-	}
-
-	public long getTotalDurationSeconds() {
-		return totalDurationSeconds;
-	}
-
-	public long getDayDurationSeconds() {
-		return dayDurationSeconds;
-	}
-
-	public long getNightDurationSeconds() {
-		return nightDurationSeconds;
-	}
-
-	public BigDecimal getDayRatePerMinute() {
-		return dayRatePerMinute;
-	}
-
-	public BigDecimal getNightRatePerMinute() {
-		return nightRatePerMinute;
-	}
-
-	public BigDecimal getDayCost() {
-		return dayCost;
-	}
-
-	public BigDecimal getNightCost() {
-		return nightCost;
-	}
-
-	public BigDecimal getTotalAmount() {
-		return totalAmount;
-	}
-
 	public ParkingCostBreakdown toCostBreakdown() {
 		return new ParkingCostBreakdown(
 				currency,

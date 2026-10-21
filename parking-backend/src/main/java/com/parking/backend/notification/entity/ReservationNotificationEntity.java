@@ -15,12 +15,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Objects;
 
 @Entity
 @Table(name = "reservation_notifications")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReservationNotificationEntity {
 
 	@Id
@@ -53,45 +58,6 @@ public class ReservationNotificationEntity {
 
 	@Column(name = "last_error", length = 512)
 	private String lastError;
-
-	protected ReservationNotificationEntity() {
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public ReservationEntity getReservation() {
-		return reservation;
-	}
-
-	public ReservationNotificationType getNotificationType() {
-		return notificationType;
-	}
-
-	public ReservationNotificationStatus getStatus() {
-		return status;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
-	}
-
-	public Instant getProcessingStartedAt() {
-		return processingStartedAt;
-	}
-
-	public Instant getSentAt() {
-		return sentAt;
-	}
-
-	public int getAttemptCount() {
-		return attemptCount;
-	}
-
-	public String getLastError() {
-		return lastError;
-	}
 
 	public void startSending(Instant startedAt) {
 		if (status != ReservationNotificationStatus.PENDING

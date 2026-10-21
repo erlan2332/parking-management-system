@@ -1,11 +1,15 @@
 package com.parking.backend.notification.config;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 
 @ConfigurationProperties(prefix = "application.notifications.mail")
+@Getter
+@Setter
 public class ReservationMailProperties implements InitializingBean {
 
 	private boolean enabled;
@@ -43,86 +47,6 @@ public class ReservationMailProperties implements InitializingBean {
 		requirePositive(connectTimeout, "MAIL_CONNECT_TIMEOUT");
 		requirePositive(readTimeout, "MAIL_READ_TIMEOUT");
 		requirePositive(writeTimeout, "MAIL_WRITE_TIMEOUT");
-	}
-
-	public boolean isEnabled() {
-		return enabled;
-	}
-
-	public void setEnabled(boolean enabled) {
-		this.enabled = enabled;
-	}
-
-	public String getHost() {
-		return host;
-	}
-
-	public void setHost(String host) {
-		this.host = host;
-	}
-
-	public int getPort() {
-		return port;
-	}
-
-	public void setPort(int port) {
-		this.port = port;
-	}
-
-	public String getUsername() {
-		return username;
-	}
-
-	public void setUsername(String username) {
-		this.username = username;
-	}
-
-	public String getPassword() {
-		return password;
-	}
-
-	public void setPassword(String password) {
-		this.password = password;
-	}
-
-	public String getFrom() {
-		return from;
-	}
-
-	public void setFrom(String from) {
-		this.from = from;
-	}
-
-	public boolean isStartTlsEnabled() {
-		return startTlsEnabled;
-	}
-
-	public void setStartTlsEnabled(boolean startTlsEnabled) {
-		this.startTlsEnabled = startTlsEnabled;
-	}
-
-	public Duration getConnectTimeout() {
-		return connectTimeout;
-	}
-
-	public void setConnectTimeout(Duration connectTimeout) {
-		this.connectTimeout = connectTimeout;
-	}
-
-	public Duration getReadTimeout() {
-		return readTimeout;
-	}
-
-	public void setReadTimeout(Duration readTimeout) {
-		this.readTimeout = readTimeout;
-	}
-
-	public Duration getWriteTimeout() {
-		return writeTimeout;
-	}
-
-	public void setWriteTimeout(Duration writeTimeout) {
-		this.writeTimeout = writeTimeout;
 	}
 
 	private static boolean isBlank(String value) {

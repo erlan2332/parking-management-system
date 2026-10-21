@@ -10,6 +10,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 
@@ -18,6 +21,8 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "vehicles")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VehicleEntity {
 
 	@Id
@@ -38,33 +43,10 @@ public class VehicleEntity {
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
-	protected VehicleEntity() {
-	}
-
 	public VehicleEntity(UserEntity user, String plateNumber, String normalizedPlate) {
 		this.user = Objects.requireNonNull(user, "User must not be null");
 		this.plateNumber = requireNonBlank(plateNumber, "Plate number").strip();
 		this.normalizedPlate = requireNonBlank(normalizedPlate, "Normalized plate");
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public UserEntity getUser() {
-		return user;
-	}
-
-	public String getPlateNumber() {
-		return plateNumber;
-	}
-
-	public String getNormalizedPlate() {
-		return normalizedPlate;
-	}
-
-	public Instant getCreatedAt() {
-		return createdAt;
 	}
 
 	private static String requireNonBlank(String value, String fieldName) {

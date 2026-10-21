@@ -3,6 +3,7 @@ package com.parking.backend.notification.service;
 import com.parking.backend.notification.entity.ReservationNotificationEntity;
 import com.parking.backend.notification.model.ClaimedReservationReminder;
 import com.parking.backend.notification.repository.ReservationNotificationRepository;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,15 +13,12 @@ import java.time.Instant;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ReservationNotificationStore {
 
 	private static final Duration REMINDER_LEAD_TIME = Duration.ofMinutes(10);
 
 	private final ReservationNotificationRepository notificationRepository;
-
-	public ReservationNotificationStore(ReservationNotificationRepository notificationRepository) {
-		this.notificationRepository = notificationRepository;
-	}
 
 	@Transactional
 	public int createDueReminders(Instant now) {

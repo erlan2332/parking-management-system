@@ -10,6 +10,7 @@ import com.parking.backend.common.exception.VehicleNotFoundException;
 import com.parking.backend.common.persistence.DatabaseConstraintViolationDetector;
 import com.parking.backend.user.entity.UserEntity;
 import com.parking.backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class VehicleService {
 
 	private static final int MAX_DISPLAY_PLATE_LENGTH = 32;
@@ -26,16 +28,6 @@ public class VehicleService {
 	private final UserRepository userRepository;
 	private final VehicleRepository vehicleRepository;
 	private final PlateNormalizer plateNormalizer;
-
-	public VehicleService(
-			UserRepository userRepository,
-			VehicleRepository vehicleRepository,
-			PlateNormalizer plateNormalizer
-	) {
-		this.userRepository = userRepository;
-		this.vehicleRepository = vehicleRepository;
-		this.plateNormalizer = plateNormalizer;
-	}
 
 	@Transactional
 	public VehicleEntity addVehicle(Long userId, String plateNumber) {
