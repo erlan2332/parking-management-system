@@ -36,7 +36,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="Вход" description="Войдите, чтобы выбрать место, управлять бронированиями и поездками.">
+    <AuthShell title="Вход">
       {state?.registeredEmail ? <p className="mb-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Аккаунт создан. Теперь войдите.</p> : null}
       <form className="grid gap-5" onSubmit={submit}>
         <Field label="Email">
