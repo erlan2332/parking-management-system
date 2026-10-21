@@ -9,12 +9,11 @@ import { Button } from '../../shared/ui/Button'
 import { Field, Select } from '../../shared/ui/FormControls'
 import { Badge, Card, PageHeader } from '../../shared/ui/Surface'
 import { ErrorState, LoadingState } from '../../shared/ui/States'
-import { invoiceKeys } from '../invoices/api'
-import { parkingKeys } from '../parking/api'
-import { reservationKeys } from '../reservations/api'
 import { vehiclesQuery } from '../vehicles/api'
-import { visitKeys, visitsQuery } from '../visits/api'
+import { visitsQuery } from '../visits/api'
 import { enterParking, exitParking } from './api'
+import { refreshAfterBarrierOperation } from './cache'
+import { findActiveVisit } from './state'
 
 export function BarrierPage() {
   const [vehicleId, setVehicleId] = useState('')
@@ -24,21 +23,15 @@ export function BarrierPage() {
   const visits = useQuery(visitsQuery())
   const selectedVehicleId = vehicleId || String(vehicles.data?.[0]?.id ?? '')
   const selectedVehicle = vehicles.data?.find((vehicle) => vehicle.id === Number(selectedVehicleId))
-  const activeVisit = visits.data?.find((visit) => visit.plateNumber === selectedVehicle?.plateNumber && visit.status === 'ACTIVE')
+  const activeVisit = findActiveVisit(visits.data, selectedVehicle)
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: parkingKeys.availabilityRoot })
-    queryClient.invalidateQueries({ queryKey: visitKeys.all })
-    queryClient.invalidateQueries({ queryKey: invoiceKeys.all })
-    queryClient.invalidateQueries({ queryKey: reservationKeys.all })
-  }
   const entry = useMutation({
     mutationFn: () => enterParking(selectedVehicle!.plateNumber),
-    onSuccess: (data) => { setResult(data); refresh() },
+    onSuccess: (data) => { setResult(data); refreshAfterBarrierOperation(queryClient) },
   })
   const exit = useMutation({
     mutationFn: () => exitParking(selectedVehicle!.plateNumber),
-    onSuccess: (data) => { setResult(data); refresh() },
+    onSuccess: (data) => { setResult(data); refreshAfterBarrierOperation(queryClient) },
   })
   const error = entry.error ?? exit.error
   const isExitResult = result !== null && 'invoiceNumber' in result
