@@ -1,19 +1,24 @@
 package com.parking.backend.invoice;
 
-import com.parking.backend.barrier.BarrierExitResult;
-import com.parking.backend.barrier.BarrierService;
+import com.parking.backend.invoice.entity.InvoiceEntity;
+import com.parking.backend.invoice.model.InvoiceStatus;
+import com.parking.backend.invoice.repository.InvoiceRepository;
+import com.parking.backend.invoice.service.InvoiceService;
+
+import com.parking.backend.barrier.model.BarrierExitResult;
+import com.parking.backend.barrier.service.BarrierService;
 import com.parking.backend.common.exception.NoActiveVisitException;
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.pricing.ParkingCostBreakdown;
-import com.parking.backend.pricing.ParkingPricingProperties;
-import com.parking.backend.pricing.ParkingPricingService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.visit.ParkingVisitEntity;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.pricing.model.ParkingCostBreakdown;
+import com.parking.backend.pricing.config.ParkingPricingProperties;
+import com.parking.backend.pricing.service.ParkingPricingService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;

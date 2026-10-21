@@ -1,5 +1,8 @@
 package com.parking.backend.security;
 
+import com.parking.backend.security.config.JwtProperties;
+import com.parking.backend.security.service.JwtService;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.oauth2.jwt.Jwt;

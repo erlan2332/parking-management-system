@@ -1,8 +1,8 @@
 package com.parking.backend.api;
 
-import com.parking.backend.parking.ParkingSpotController;
+import com.parking.backend.parking.controller.ParkingSpotController;
 import com.parking.backend.parking.dto.ParkingSpotResponse;
-import com.parking.backend.security.JwtService;
+import com.parking.backend.security.service.JwtService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

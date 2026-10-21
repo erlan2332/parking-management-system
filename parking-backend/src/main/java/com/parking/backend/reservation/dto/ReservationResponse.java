@@ -1,7 +1,7 @@
 package com.parking.backend.reservation.dto;
 
-import com.parking.backend.reservation.ReservationEntity;
-import com.parking.backend.reservation.ReservationStatus;
+import com.parking.backend.reservation.entity.ReservationEntity;
+import com.parking.backend.reservation.model.ReservationStatus;
 
 import java.time.Instant;
 

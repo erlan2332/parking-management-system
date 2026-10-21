@@ -1,8 +1,8 @@
 package com.parking.backend.visit.dto;
 
-import com.parking.backend.visit.ParkingEntryType;
-import com.parking.backend.visit.ParkingVisitEntity;
-import com.parking.backend.visit.ParkingVisitStatus;
+import com.parking.backend.visit.model.ParkingEntryType;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
+import com.parking.backend.visit.model.ParkingVisitStatus;
 
 import java.time.Duration;
 import java.time.Instant;

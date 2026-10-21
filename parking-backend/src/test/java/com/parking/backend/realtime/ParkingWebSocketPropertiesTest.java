@@ -1,5 +1,7 @@
 package com.parking.backend.realtime;
 
+import com.parking.backend.realtime.config.ParkingWebSocketProperties;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

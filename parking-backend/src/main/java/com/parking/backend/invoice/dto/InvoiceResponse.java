@@ -1,7 +1,7 @@
 package com.parking.backend.invoice.dto;
 
-import com.parking.backend.invoice.InvoiceEntity;
-import com.parking.backend.invoice.InvoiceStatus;
+import com.parking.backend.invoice.entity.InvoiceEntity;
+import com.parking.backend.invoice.model.InvoiceStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;

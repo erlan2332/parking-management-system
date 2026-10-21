@@ -1,14 +1,20 @@
 package com.parking.backend.reservation;
 
+import com.parking.backend.reservation.entity.ReservationEntity;
+import com.parking.backend.reservation.model.ReservationStatus;
+import com.parking.backend.reservation.policy.ReservationEntryPolicy;
+import com.parking.backend.reservation.repository.ReservationRepository;
+import com.parking.backend.reservation.service.ReservationService;
+
 import com.parking.backend.common.exception.InvalidReservationRequestException;
 import com.parking.backend.common.exception.ReservationConflictException;
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.realtime.ParkingChangePublisher;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.realtime.service.ParkingChangePublisher;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,8 +1,8 @@
 package com.parking.backend.parking.dto;
 
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotState;
-import com.parking.backend.parking.ParkingSpotStatus;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.model.ParkingSpotState;
+import com.parking.backend.parking.model.ParkingSpotStatus;
 
 public record ParkingSpotResponse(
 		Long id,

@@ -1,6 +1,6 @@
 package com.parking.backend.vehicle.dto;
 
-import com.parking.backend.vehicle.VehicleEntity;
+import com.parking.backend.vehicle.entity.VehicleEntity;
 
 public record VehicleResponse(
 		Long id,

@@ -1,14 +1,14 @@
 package com.parking.backend.api;
 
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.security.JwtService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.visit.ParkingVisitEntity;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.security.service.JwtService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,5 +1,7 @@
 package com.parking.backend.notification;
 
+import com.parking.backend.notification.config.ReservationMailProperties;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

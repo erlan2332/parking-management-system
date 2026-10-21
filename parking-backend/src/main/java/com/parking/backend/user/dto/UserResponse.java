@@ -1,6 +1,6 @@
 package com.parking.backend.user.dto;
 
-import com.parking.backend.user.UserEntity;
+import com.parking.backend.user.entity.UserEntity;
 
 import java.time.Instant;
 

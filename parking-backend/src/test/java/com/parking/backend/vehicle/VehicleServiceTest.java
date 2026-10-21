@@ -1,9 +1,14 @@
 package com.parking.backend.vehicle;
 
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.vehicle.service.PlateNormalizer;
+import com.parking.backend.vehicle.service.VehicleService;
+
 import com.parking.backend.common.exception.DuplicateVehiclePlateException;
 import com.parking.backend.common.exception.UserNotFoundException;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

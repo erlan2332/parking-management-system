@@ -1,14 +1,16 @@
 package com.parking.backend.auth;
 
+import com.parking.backend.auth.service.AuthService;
+
 import com.parking.backend.auth.dto.AuthResponse;
 import com.parking.backend.auth.dto.LoginRequest;
 import com.parking.backend.auth.dto.RegisterRequest;
 import com.parking.backend.auth.dto.RegisteredUserResponse;
 import com.parking.backend.common.exception.EmailAlreadyExistsException;
 import com.parking.backend.common.exception.InvalidCredentialsException;
-import com.parking.backend.security.JwtService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
+import com.parking.backend.security.service.JwtService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

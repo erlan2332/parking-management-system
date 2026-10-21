@@ -1,7 +1,7 @@
 package com.parking.backend.visit.dto;
 
-import com.parking.backend.pricing.ParkingCostBreakdown;
-import com.parking.backend.visit.ParkingVisitEntity;
+import com.parking.backend.pricing.model.ParkingCostBreakdown;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
 
 import java.math.BigDecimal;
 import java.time.Instant;

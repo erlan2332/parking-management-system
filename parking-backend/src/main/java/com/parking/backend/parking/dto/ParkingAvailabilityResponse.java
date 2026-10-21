@@ -1,7 +1,7 @@
 package com.parking.backend.parking.dto;
 
-import com.parking.backend.parking.ParkingSpotAvailability;
-import com.parking.backend.parking.ParkingSpotStatus;
+import com.parking.backend.parking.model.ParkingSpotAvailability;
+import com.parking.backend.parking.model.ParkingSpotStatus;
 
 import java.time.OffsetDateTime;
 import java.util.List;

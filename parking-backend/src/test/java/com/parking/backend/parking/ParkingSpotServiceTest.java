@@ -1,11 +1,17 @@
 package com.parking.backend.parking;
 
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.model.ParkingSpotAvailability;
+import com.parking.backend.parking.model.ParkingSpotStatus;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.parking.service.ParkingSpotService;
+
 import com.parking.backend.common.exception.InvalidParkingIntervalException;
 import com.parking.backend.common.exception.ParkingSpotNotFoundException;
-import com.parking.backend.reservation.ReservationEntryPolicy;
-import com.parking.backend.reservation.ReservationRepository;
-import com.parking.backend.reservation.ReservationStatus;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.reservation.policy.ReservationEntryPolicy;
+import com.parking.backend.reservation.repository.ReservationRepository;
+import com.parking.backend.reservation.model.ReservationStatus;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

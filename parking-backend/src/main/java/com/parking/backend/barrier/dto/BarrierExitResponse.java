@@ -1,10 +1,10 @@
 package com.parking.backend.barrier.dto;
 
-import com.parking.backend.barrier.BarrierExitResult;
-import com.parking.backend.invoice.InvoiceEntity;
-import com.parking.backend.visit.ParkingEntryType;
-import com.parking.backend.visit.ParkingVisitEntity;
-import com.parking.backend.visit.ParkingVisitStatus;
+import com.parking.backend.barrier.model.BarrierExitResult;
+import com.parking.backend.invoice.entity.InvoiceEntity;
+import com.parking.backend.visit.model.ParkingEntryType;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
+import com.parking.backend.visit.model.ParkingVisitStatus;
 
 import java.math.BigDecimal;
 import java.time.Duration;

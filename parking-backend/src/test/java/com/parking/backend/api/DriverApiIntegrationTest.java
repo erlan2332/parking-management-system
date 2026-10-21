@@ -1,12 +1,12 @@
 package com.parking.backend.api;
 
 import com.jayway.jsonpath.JsonPath;
-import com.parking.backend.security.JwtService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.vehicle.VehicleService;
+import com.parking.backend.security.service.JwtService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.vehicle.service.VehicleService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
