@@ -21,10 +21,8 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -119,14 +117,12 @@ class VehicleServiceTest {
 	}
 
 	@Test
-	void checksVehicleOwnership() {
-		when(vehicleRepository.existsByIdAndUser_Id(100L, USER_ID)).thenReturn(true);
-		when(vehicleRepository.existsByIdAndUser_Id(101L, USER_ID)).thenReturn(false);
+	void returnsVehicleOwnedByRequestedUser() {
+		VehicleEntity vehicle = new VehicleEntity(user(), "A100AA", "A100AA");
+		when(vehicleRepository.findByIdAndUser_Id(100L, USER_ID)).thenReturn(Optional.of(vehicle));
 
-		assertTrue(vehicleService.belongsToUser(100L, USER_ID));
-		assertFalse(vehicleService.belongsToUser(101L, USER_ID));
-		verify(vehicleRepository).existsByIdAndUser_Id(100L, USER_ID);
-		verify(vehicleRepository).existsByIdAndUser_Id(101L, USER_ID);
+		assertSame(vehicle, vehicleService.getVehicleByIdForUser(100L, USER_ID));
+		verify(vehicleRepository).findByIdAndUser_Id(100L, USER_ID);
 	}
 
 	private static UserEntity user() {

@@ -15,9 +15,6 @@ import java.util.Optional;
 
 public interface ParkingVisitRepository extends JpaRepository<ParkingVisitEntity, Long> {
 
-	@EntityGraph(attributePaths = {"vehicle", "spot", "reservation"})
-	Optional<ParkingVisitEntity> findByVehicle_IdAndExitedAtIsNull(Long vehicleId);
-
 	@Query("""
 			SELECT new com.parking.backend.visit.model.ParkingVisitLockTarget(visit.id, visit.spot.id)
 			FROM ParkingVisitEntity visit
@@ -30,8 +27,8 @@ public interface ParkingVisitRepository extends JpaRepository<ParkingVisitEntity
 
 	boolean existsBySpot_IdAndExitedAtIsNull(Long spotId);
 
-	@EntityGraph(attributePaths = "spot")
-	List<ParkingVisitEntity> findAllByExitedAtIsNull();
+	@Query("SELECT visit.spot.id FROM ParkingVisitEntity visit WHERE visit.exitedAt IS NULL")
+	List<Long> findActiveSpotIds();
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""

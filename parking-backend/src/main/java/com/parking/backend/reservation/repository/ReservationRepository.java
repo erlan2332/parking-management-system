@@ -36,12 +36,6 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 			Collection<ReservationStatus> statuses
 	);
 
-	@EntityGraph(attributePaths = "spot")
-	List<ReservationEntity> findAllByVehicle_IdAndStatusOrderByStartAtAscIdAsc(
-			Long vehicleId,
-			ReservationStatus status
-	);
-
 	@Query("""
 			SELECT new com.parking.backend.reservation.model.ReservationEntryTarget(
 			    reservation.id,

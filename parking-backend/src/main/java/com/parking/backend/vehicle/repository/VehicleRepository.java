@@ -15,8 +15,6 @@ public interface VehicleRepository extends JpaRepository<VehicleEntity, Long> {
 
 	List<VehicleEntity> findAllByUser_IdOrderByIdAsc(Long userId);
 
-	Optional<VehicleEntity> findByNormalizedPlate(String normalizedPlate);
-
 	Optional<VehicleEntity> findByNormalizedPlateAndUser_Id(String normalizedPlate, Long userId);
 
 	Optional<VehicleEntity> findByIdAndUser_Id(Long vehicleId, Long userId);
@@ -31,5 +29,4 @@ public interface VehicleRepository extends JpaRepository<VehicleEntity, Long> {
 
 	boolean existsByNormalizedPlate(String normalizedPlate);
 
-	boolean existsByIdAndUser_Id(Long vehicleId, Long userId);
 }

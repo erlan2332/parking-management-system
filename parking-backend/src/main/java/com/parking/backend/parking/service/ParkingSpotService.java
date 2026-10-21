@@ -12,7 +12,6 @@ import com.parking.backend.reservation.entity.ReservationEntity;
 import com.parking.backend.reservation.policy.ReservationEntryPolicy;
 import com.parking.backend.reservation.repository.ReservationRepository;
 import com.parking.backend.reservation.model.ReservationStatus;
-import com.parking.backend.visit.entity.ParkingVisitEntity;
 import com.parking.backend.visit.repository.ParkingVisitRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,18 +42,9 @@ public class ParkingSpotService {
 	private final Clock clock;
 
 	@Transactional(readOnly = true)
-	public List<ParkingSpotEntity> getAllSpots() {
-		return List.copyOf(parkingSpotRepository.findAllInNaturalCodeOrder());
-	}
-
-	@Transactional(readOnly = true)
 	public ParkingSpotEntity getSpotById(Long id) {
 		return parkingSpotRepository.findById(id)
 				.orElseThrow(() -> new ParkingSpotNotFoundException(id));
-	}
-
-	public ParkingSpotStatus determineStatus(ParkingSpotEntity parkingSpot) {
-		return parkingSpot.isActive() ? ParkingSpotStatus.FREE : ParkingSpotStatus.UNAVAILABLE;
 	}
 
 	@Transactional(readOnly = true)
@@ -157,10 +147,7 @@ public class ParkingSpotService {
 	}
 
 	private Set<Long> occupiedSpotIds() {
-		return parkingVisitRepository.findAllByExitedAtIsNull().stream()
-				.map(ParkingVisitEntity::getSpot)
-				.map(ParkingSpotEntity::getId)
-				.collect(Collectors.toUnmodifiableSet());
+		return Set.copyOf(parkingVisitRepository.findActiveSpotIds());
 	}
 
 	private static boolean isOccupied(ParkingSpotEntity spot, Set<Long> occupiedSpotIds) {

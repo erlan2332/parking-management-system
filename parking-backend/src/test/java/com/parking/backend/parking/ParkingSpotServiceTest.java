@@ -64,15 +64,19 @@ class ParkingSpotServiceTest {
 	@Test
 	void returnsFreeForActiveSpot() {
 		ParkingSpotEntity spot = new ParkingSpotEntity("A1", true);
+		when(parkingSpotRepository.findAllInNaturalCodeOrder()).thenReturn(List.of(spot));
+		stubNoBlockingReservations();
 
-		assertEquals(ParkingSpotStatus.FREE, parkingSpotService.determineStatus(spot));
+		assertEquals(ParkingSpotStatus.FREE, parkingSpotService.getCurrentSpotStates().getFirst().status());
 	}
 
 	@Test
 	void returnsUnavailableForInactiveSpot() {
 		ParkingSpotEntity spot = new ParkingSpotEntity("A1", false);
+		when(parkingSpotRepository.findAllInNaturalCodeOrder()).thenReturn(List.of(spot));
+		stubNoBlockingReservations();
 
-		assertEquals(ParkingSpotStatus.UNAVAILABLE, parkingSpotService.determineStatus(spot));
+		assertEquals(ParkingSpotStatus.UNAVAILABLE, parkingSpotService.getCurrentSpotStates().getFirst().status());
 	}
 
 	@Test
@@ -140,14 +144,14 @@ class ParkingSpotServiceTest {
 	@Test
 	void readOperationsDoNotModifyParkingSpotData() {
 		ParkingSpotEntity spot = new ParkingSpotEntity("B10", false);
-		when(parkingSpotRepository.findAllInNaturalCodeOrder()).thenReturn(List.of(spot));
+		when(parkingSpotRepository.findById(10L)).thenReturn(Optional.of(spot));
 
-		List<ParkingSpotEntity> result = parkingSpotService.getAllSpots();
+		ParkingSpotEntity result = parkingSpotService.getSpotById(10L);
 
-		assertEquals(List.of(spot), result);
+		assertEquals(spot, result);
 		assertEquals("B10", spot.getCode());
 		assertFalse(spot.isActive());
-		verify(parkingSpotRepository).findAllInNaturalCodeOrder();
+		verify(parkingSpotRepository).findById(10L);
 		verifyNoMoreInteractions(parkingSpotRepository);
 	}
 
@@ -161,6 +165,6 @@ class ParkingSpotServiceTest {
 				eq(ReservationStatus.ACTIVE),
 				anyCollection()
 		)).thenReturn(List.of());
-		when(parkingVisitRepository.findAllByExitedAtIsNull()).thenReturn(List.of());
+		when(parkingVisitRepository.findActiveSpotIds()).thenReturn(List.of());
 	}
 }

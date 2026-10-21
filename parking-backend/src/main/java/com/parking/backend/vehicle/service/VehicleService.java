@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -53,23 +52,6 @@ public class VehicleService {
 	public List<VehicleEntity> getVehiclesByUserId(Long userId) {
 		findUser(userId);
 		return vehicleRepository.findAllByUser_IdOrderByIdAsc(userId);
-	}
-
-	@Transactional(readOnly = true)
-	public Optional<VehicleEntity> findByPlate(String plateNumber) {
-		String normalizedPlate = plateNormalizer.normalize(plateNumber);
-		return vehicleRepository.findByNormalizedPlate(normalizedPlate);
-	}
-
-	@Transactional(readOnly = true)
-	public boolean plateExists(String plateNumber) {
-		String normalizedPlate = plateNormalizer.normalize(plateNumber);
-		return vehicleRepository.existsByNormalizedPlate(normalizedPlate);
-	}
-
-	@Transactional(readOnly = true)
-	public boolean belongsToUser(Long vehicleId, Long userId) {
-		return vehicleRepository.existsByIdAndUser_Id(vehicleId, userId);
 	}
 
 	@Transactional(readOnly = true)
