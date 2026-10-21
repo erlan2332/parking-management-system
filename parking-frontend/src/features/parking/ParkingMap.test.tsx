@@ -19,8 +19,9 @@ describe('ParkingMap', () => {
 
     expect(screen.getByRole('button', { name: 'A1: Свободно' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'A2: Временно удерживается' })).toBeDisabled()
+    expect(screen.getByText('Удержание')).toBeInTheDocument()
     expect(screen.getByText('Забронировано')).toBeInTheDocument()
-    expect(screen.getByText('Занято автомобилем')).toBeInTheDocument()
+    expect(screen.getByText('Занято')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'A1: Свободно' }))
     expect(onSelect).toHaveBeenCalledWith(spots[0])
   })

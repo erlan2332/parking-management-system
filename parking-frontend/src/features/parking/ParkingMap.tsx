@@ -10,6 +10,11 @@ const statusStyles: Record<ParkingSpotStatus, string> = {
   UNAVAILABLE: 'border-slate-300 bg-slate-100 text-slate-500',
 }
 
+const compactStatusLabels: Record<ParkingSpotStatus, string> = {
+  ...parkingStatusLabels,
+  HELD: 'Удержание',
+}
+
 export function ParkingMap({ spots, onSelect, pendingSpotId }: { spots: SpotAvailabilityResponse[]; onSelect: (spot: SpotAvailabilityResponse) => void; pendingSpotId?: number }) {
   const zones = [
     { name: 'Зона A', spots: spots.filter((spot) => spot.code.startsWith('A')) },
@@ -30,12 +35,12 @@ export function ParkingMap({ spots, onSelect, pendingSpotId }: { spots: SpotAvai
                 disabled={!spot.available || pendingSpotId !== undefined}
                 onClick={() => onSelect(spot)}
                 aria-label={`${spot.code}: ${parkingStatusLabels[spot.status]}`}
-                className={`relative min-h-24 rounded-xl border-2 p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 disabled:cursor-not-allowed ${statusStyles[spot.status]}`}
+                className={`relative h-24 rounded-xl border-2 p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 disabled:cursor-not-allowed ${statusStyles[spot.status]}`}
               >
                 {pendingSpotId === spot.id ? <span className="absolute right-2 top-2 size-4 animate-spin rounded-full border-2 border-current border-r-transparent" /> : null}
                 {spot.status === 'OCCUPIED' ? <CarFront className="size-5" aria-hidden="true" /> : <CircleParking className="size-5" aria-hidden="true" />}
                 <strong className="mt-2 block text-base">{spot.code}</strong>
-                <span className="mt-1 block text-[11px] leading-4">{parkingStatusLabels[spot.status]}</span>
+                <span className="mt-1 block whitespace-nowrap text-[11px] leading-4">{compactStatusLabels[spot.status]}</span>
               </button>
             ))}
           </div>
