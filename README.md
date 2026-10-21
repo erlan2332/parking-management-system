@@ -5,7 +5,7 @@ Full-stack paid parking management system.
 ## Tech Stack
 
 - Backend: Java 21, Spring Boot, Gradle
-- Frontend: React, TypeScript (planned)
+- Frontend: React 19, TypeScript 6, Vite 8, Tailwind CSS 4
 - Database: PostgreSQL, Flyway
 - Security: Spring Security, OAuth2 Resource Server, JWT (HS256)
 - Infrastructure: GitHub Actions with PostgreSQL service containers
@@ -13,7 +13,7 @@ Full-stack paid parking management system.
 ## Project Structure
 
 - parking-backend/ - Spring Boot backend
-- parking-frontend/ - React frontend (planned)
+- parking-frontend/ - React driver application
 
 ## Current Status
 
@@ -29,12 +29,18 @@ Confirmed reservations expire automatically after a missed entry window, and
 checked-in drivers can receive one ending-soon email reminder when SMTP is
 enabled. Authenticated STOMP clients receive real-time parking availability
 change notifications and then refresh their selected interval through REST.
-The frontend is not implemented yet.
+The responsive React frontend uses the real REST and STOMP contracts for the
+complete driver journey: authentication, vehicles, interval-aware parking
+availability, temporary holds, reservations, barrier entry/exit, visits, and
+historical invoices.
 
-## Planned Features
+## Known Product Limits
 
-- React + TypeScript driver interface
-- Payment processing (invoices already exist; payments do not)
+- Payment processing, PDF invoices, and an administrative interface are not
+  part of the current scope.
+- JWT access tokens expire after 60 minutes and are not refreshed.
+- The embedded STOMP broker is intended for a single Backend instance and does
+  not replay events missed while a client is disconnected.
 
 ## Backend Architecture
 
@@ -68,6 +74,7 @@ so lock order and atomic invoice creation remain unchanged.
 ### Prerequisites
 
 - Java 21 (`java -version` must report 21)
+- Node.js 22 LTS and npm (`node --version` must report 22)
 - PostgreSQL with the `btree_gist` extension files available; PostgreSQL 14 and
   17 are verified by local and CI runs
 - the committed Gradle Wrapper (`parking-backend/gradlew`); a system Gradle
@@ -151,6 +158,8 @@ No production domain is assumed.
 
 ### Build and run
 
+Start the Backend first:
+
 ```bash
 cd parking-backend
 ./gradlew bootRun
@@ -167,6 +176,46 @@ cd parking-backend
 
 The build requires `TEST_DB_*` because the persistence tests apply the real
 Flyway migrations and verify PostgreSQL-specific constraints; H2 is not used.
+
+In a second shell, configure and start the Frontend:
+
+```bash
+cd parking-frontend
+cp .env.example .env.local
+npm ci
+npm run dev
+```
+
+The default local endpoints are:
+
+- Frontend: `http://localhost:5173`
+- Backend REST: `http://localhost:8080`
+- WebSocket/STOMP: `ws://localhost:8080/ws/parking`
+- PostgreSQL: `localhost:5432`
+
+`VITE_API_BASE_URL` and `VITE_WS_URL` in `.env.local` select the Backend
+endpoints. They are public client configuration, not secrets. Vite uses port
+5173 with `strictPort`, so it fails instead of silently choosing another port.
+
+### Driver journey in the browser
+
+1. Open `http://localhost:5173`, register, and log in.
+2. Add a plate under **Мои автомобили**.
+3. On **Парковка**, select the vehicle, date, and interval, then choose a free
+   spot. The server creates a three-minute Temporary Hold; confirm it before
+   the displayed deadline.
+4. Review or cancel a future booking under **Мои бронирования**.
+5. Use **Шлагбаум** for real entry and exit. A walk-in receives the first safe
+   free spot; exit creates a completed visit and immutable invoice.
+6. Open **История парковки** and follow its invoice link to **Счета** for the
+   saved day/night tariff breakdown.
+
+To verify WebSocket updates, open two independent browser sessions, register
+two users, and keep both on **Парковка** with overlapping intervals. Creating,
+confirming, releasing, or expiring a hold in one session updates the other
+without a page reload. The event is only an invalidation signal; each client
+reloads authoritative availability through REST. When WebSocket is temporarily
+unavailable, normal REST navigation and mutations remain usable.
 
 To verify the initial data:
 
@@ -579,9 +628,15 @@ one `btree_gist` row, and a parking spot count of 20. Restart with
 
 ## Continuous Integration
 
-The backend workflow is defined in `.github/workflows/backend-ci.yml`. It runs
-for every pull request targeting `dev-parking`, for new commits added to such a
-pull request, and after changes are pushed to `dev-parking`.
+The repository has separate workflows for each application:
+
+- `.github/workflows/backend-ci.yml` starts PostgreSQL and runs the Backend
+  assembly plus smoke suite;
+- `.github/workflows/frontend-ci.yml` uses Node.js 22 and runs `npm ci`, lint,
+  TypeScript, Vitest, and the production build without requiring PostgreSQL.
+
+Both run for every pull request targeting `dev-parking`, for new commits added
+to such a pull request, and after changes are pushed to `dev-parking`.
 
 GitHub Actions starts an ephemeral PostgreSQL 17 Docker service with a health
 check. The service creates an isolated CI user and database, then Flyway applies
@@ -622,3 +677,20 @@ cd parking-backend
 
 A successful Smoke CI run confirms only the selected critical scenarios; it
 does not mean that the full test suite has been executed.
+
+Run the complete Frontend quality gate locally with:
+
+```bash
+cd parking-frontend
+npm ci
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
+```
+
+The Frontend tests cover protected authentication, JWT headers, parking status
+semantics, Temporary Hold DTOs, the server-deadline countdown, conflict error
+translation, WebSocket-driven query invalidation, and cache refresh after a
+barrier operation. Real browser verification against a running Backend remains
+required for the end-to-end booking and invoice journeys.
