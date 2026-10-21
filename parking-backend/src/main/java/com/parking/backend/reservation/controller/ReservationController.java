@@ -1,6 +1,7 @@
 package com.parking.backend.reservation.controller;
 
 import com.parking.backend.reservation.entity.ReservationEntity;
+import com.parking.backend.reservation.mapper.ReservationMapper;
 import com.parking.backend.reservation.service.ReservationService;
 
 import com.parking.backend.reservation.dto.CreateHoldRequest;
@@ -8,6 +9,7 @@ import com.parking.backend.reservation.dto.HoldResponse;
 import com.parking.backend.reservation.dto.ReservationResponse;
 import com.parking.backend.security.web.CurrentUserIdResolver;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,18 +25,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reservations")
+@RequiredArgsConstructor
 public class ReservationController {
 
 	private final ReservationService reservationService;
+	private final ReservationMapper reservationMapper;
 	private final CurrentUserIdResolver currentUserIdResolver;
-
-	public ReservationController(
-			ReservationService reservationService,
-			CurrentUserIdResolver currentUserIdResolver
-	) {
-		this.reservationService = reservationService;
-		this.currentUserIdResolver = currentUserIdResolver;
-	}
 
 	@PostMapping("/holds")
 	public ResponseEntity<HoldResponse> createHold(
@@ -49,40 +45,36 @@ public class ReservationController {
 				request.startAt(),
 				request.endAt()
 		);
-		return ResponseEntity.status(HttpStatus.CREATED).body(HoldResponse.from(hold));
+		return ResponseEntity.status(HttpStatus.CREATED).body(reservationMapper.toHoldResponse(hold));
 	}
 
 	@PostMapping("/holds/{id}/confirm")
 	public ReservationResponse confirmHold(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
 		Long userId = currentUserIdResolver.resolve(jwt);
-		return ReservationResponse.from(reservationService.confirmHold(userId, id));
+		return reservationMapper.toResponse(reservationService.confirmHold(userId, id));
 	}
 
 	@PostMapping("/holds/{id}/release")
 	public HoldResponse releaseHold(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
 		Long userId = currentUserIdResolver.resolve(jwt);
-		return HoldResponse.from(reservationService.releaseHold(userId, id));
+		return reservationMapper.toHoldResponse(reservationService.releaseHold(userId, id));
 	}
 
 	@GetMapping("/holds/my")
 	public List<HoldResponse> getMyHolds(@AuthenticationPrincipal Jwt jwt) {
 		Long userId = currentUserIdResolver.resolve(jwt);
-		return reservationService.getMyActiveHolds(userId).stream()
-				.map(HoldResponse::from)
-				.toList();
+		return reservationMapper.toHoldResponses(reservationService.getMyActiveHolds(userId));
 	}
 
 	@GetMapping("/my")
 	public List<ReservationResponse> getMyReservations(@AuthenticationPrincipal Jwt jwt) {
 		Long userId = currentUserIdResolver.resolve(jwt);
-		return reservationService.getMyReservations(userId).stream()
-				.map(ReservationResponse::from)
-				.toList();
+		return reservationMapper.toResponses(reservationService.getMyReservations(userId));
 	}
 
 	@PostMapping("/{id}/cancel")
 	public ReservationResponse cancelReservation(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
 		Long userId = currentUserIdResolver.resolve(jwt);
-		return ReservationResponse.from(reservationService.cancelReservation(userId, id));
+		return reservationMapper.toResponse(reservationService.cancelReservation(userId, id));
 	}
 }

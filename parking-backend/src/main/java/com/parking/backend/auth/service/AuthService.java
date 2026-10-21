@@ -1,9 +1,5 @@
 package com.parking.backend.auth.service;
 
-import com.parking.backend.auth.dto.AuthResponse;
-import com.parking.backend.auth.dto.LoginRequest;
-import com.parking.backend.auth.dto.RegisterRequest;
-import com.parking.backend.auth.dto.RegisteredUserResponse;
 import com.parking.backend.common.exception.EmailAlreadyExistsException;
 import com.parking.backend.common.exception.InvalidCredentialsException;
 import com.parking.backend.common.exception.InvalidPasswordException;
@@ -11,6 +7,7 @@ import com.parking.backend.common.persistence.DatabaseConstraintViolationDetecto
 import com.parking.backend.security.service.JwtService;
 import com.parking.backend.user.entity.UserEntity;
 import com.parking.backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
 	private static final int MIN_PASSWORD_CHARACTERS = 10;
@@ -30,29 +28,18 @@ public class AuthService {
 	private final PasswordEncoder passwordEncoder;
 	private final JwtService jwtService;
 
-	public AuthService(
-			UserRepository userRepository,
-			PasswordEncoder passwordEncoder,
-			JwtService jwtService
-	) {
-		this.userRepository = userRepository;
-		this.passwordEncoder = passwordEncoder;
-		this.jwtService = jwtService;
-	}
-
 	@Transactional
-	public RegisteredUserResponse register(RegisterRequest request) {
-		String email = normalizeEmail(request.email());
-		validateRegistrationPassword(request.password());
+	public UserEntity register(String rawEmail, String password) {
+		String email = normalizeEmail(rawEmail);
+		validateRegistrationPassword(password);
 
 		if (userRepository.existsByEmailIgnoreCase(email)) {
 			throw new EmailAlreadyExistsException();
 		}
 
-		UserEntity user = new UserEntity(email, passwordEncoder.encode(request.password()));
+		UserEntity user = new UserEntity(email, passwordEncoder.encode(password));
 		try {
-			UserEntity savedUser = userRepository.saveAndFlush(user);
-			return new RegisteredUserResponse(savedUser.getId(), savedUser.getEmail());
+			return userRepository.saveAndFlush(user);
 		} catch (DataIntegrityViolationException exception) {
 			if (DatabaseConstraintViolationDetector.hasConstraint(exception, UNIQUE_EMAIL_CONSTRAINT)) {
 				throw new EmailAlreadyExistsException(exception);
@@ -62,18 +49,17 @@ public class AuthService {
 	}
 
 	@Transactional(readOnly = true)
-	public AuthResponse login(LoginRequest request) {
-		String email = normalizeEmail(request.email());
-		validateLoginPassword(request.password());
+	public JwtService.IssuedToken login(String rawEmail, String password) {
+		String email = normalizeEmail(rawEmail);
+		validateLoginPassword(password);
 		UserEntity user = userRepository.findByEmailIgnoreCase(email)
 				.orElseThrow(InvalidCredentialsException::new);
 
-		if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+		if (!passwordEncoder.matches(password, user.getPasswordHash())) {
 			throw new InvalidCredentialsException();
 		}
 
-		JwtService.IssuedToken token = jwtService.issueToken(user.getId());
-		return new AuthResponse(token.value(), "Bearer", token.expiresInSeconds());
+		return jwtService.issueToken(user.getId());
 	}
 
 	private static String normalizeEmail(String email) {
