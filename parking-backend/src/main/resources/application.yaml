@@ -2,8 +2,8 @@ spring:
   application:
     name: parking-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/parking_db}
-    username: ${DB_USERNAME:parking_user}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
   jpa:
     hibernate:
@@ -19,6 +19,8 @@ application:
       secret-base64: ${JWT_SECRET_BASE64:}
       issuer: parking-management-system
       access-token-ttl: PT1H
+    cors:
+      allowed-origins: ${PARKING_REST_ALLOWED_ORIGINS:http://localhost:5173}
   reservations:
     automation-delay: ${RESERVATION_AUTOMATION_DELAY:PT30S}
   realtime:

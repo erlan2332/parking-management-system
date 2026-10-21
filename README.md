@@ -8,7 +8,7 @@ Full-stack paid parking management system.
 - Frontend: React, TypeScript (planned)
 - Database: PostgreSQL, Flyway
 - Security: Spring Security, OAuth2 Resource Server, JWT (HS256)
-- Infrastructure: Docker Compose (planned)
+- Infrastructure: GitHub Actions with PostgreSQL service containers
 
 ## Project Structure
 
@@ -33,17 +33,19 @@ The frontend is not implemented yet.
 
 ## Planned Features
 
-- Driver profiles and vehicles
-- Parking spot management
-- Payments and payment history
+- React + TypeScript driver interface
+- Payment processing (invoices already exist; payments do not)
 
 ## Local Development
 
 ### Prerequisites
 
-- Java 21
-- PostgreSQL running on `localhost:5432`
-- A database and user created for local development
+- Java 21 (`java -version` must report 21)
+- PostgreSQL with the `btree_gist` extension files available; PostgreSQL 14 and
+  17 are verified by local and CI runs
+- the committed Gradle Wrapper (`parking-backend/gradlew`); a system Gradle
+  installation is not required
+- an empty application database plus a separate, disposable test database
 
 Example PostgreSQL setup (run as a PostgreSQL administrator):
 
@@ -51,6 +53,19 @@ Example PostgreSQL setup (run as a PostgreSQL administrator):
 CREATE USER parking_user WITH PASSWORD 'choose_a_local_password';
 CREATE DATABASE parking_db OWNER parking_user;
 CREATE DATABASE parking_test_db OWNER parking_user;
+```
+
+Migration V4 runs `CREATE EXTENSION IF NOT EXISTS btree_gist`. On supported
+PostgreSQL releases `btree_gist` is a trusted extension, so the database owner
+can install it when the extension package is present. The application role
+therefore needs `CONNECT` and normal schema rights and should own the empty
+database; it does not need to be a PostgreSQL superuser. If a managed provider
+does not permit the owner to install extensions, ask its administrator to run
+the following once in the new application database instead of granting broad
+superuser rights:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 ```
 
 ### Environment variables
@@ -73,6 +88,7 @@ export PARKING_DAY_RATE_PER_MINUTE='2.00'
 export PARKING_NIGHT_RATE_PER_MINUTE='1.00'
 
 export RESERVATION_AUTOMATION_DELAY='PT30S'
+export PARKING_REST_ALLOWED_ORIGINS='http://localhost:5173'
 export PARKING_WEBSOCKET_ALLOWED_ORIGINS='http://localhost:5173'
 export MAIL_ENABLED='false'
 
@@ -81,12 +97,13 @@ export TEST_DB_USERNAME='parking_user'
 export TEST_DB_PASSWORD='choose_a_local_password'
 ```
 
-`DB_URL` and `DB_USERNAME` have local-development defaults. `DB_PASSWORD` is
-required and intentionally has no default value. Integration tests use the
-separate `TEST_DB_*` connection and never point to `parking_db` by default.
+`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and `JWT_SECRET_BASE64` are mandatory
+and intentionally have no runtime credentials or connection defaults.
 `JWT_SECRET_BASE64` must decode to at least 32 random bytes. Keep the same local
 secret across restarts if previously issued access tokens should remain valid.
-The committed test profile contains only an isolated test key; production and
+Full and smoke integration tests require all three `TEST_DB_*` variables and
+must point to a dedicated disposable database, never `parking_db`. The
+committed test profile contains only an isolated JWT test key; production and
 local runtime configuration never fall back to it.
 
 Pricing defaults to `Asia/Bishkek`, a half-open day period of `[08:00, 20:00)`,
@@ -97,23 +114,32 @@ Reservation automation runs every 30 seconds by default. Email is disabled by
 default, so cleanup, registration, reservations, the barrier, and invoices run
 without an SMTP server.
 
-The WebSocket handshake accepts only origins listed in
-`PARKING_WEBSOCKET_ALLOWED_ORIGINS` (comma-separated when several are needed).
-Local development defaults to `http://localhost:5173`; wildcard origins are
-rejected and no production domain is assumed.
+Browser REST calls accept only origins listed in
+`PARKING_REST_ALLOWED_ORIGINS`; only the current `GET`, `POST`, and `OPTIONS`
+methods and `Authorization`/`Content-Type` request headers are allowed. The
+WebSocket handshake separately uses `PARKING_WEBSOCKET_ALLOWED_ORIGINS`.
+Both variables accept a comma-separated list, default to
+`http://localhost:5173` for local development, and reject wildcard origins.
+No production domain is assumed.
 
 ### Build and run
 
 ```bash
 cd parking-backend
-./gradlew clean build
 ./gradlew bootRun
 ```
 
 Flyway applies migrations from `src/main/resources/db/migration` before
 Hibernate validates the schema. Hibernate does not create or update tables.
-`./gradlew clean build` requires the separate PostgreSQL test database because
-the persistence tests verify PostgreSQL-specific constraints and do not use H2.
+To run the complete build separately:
+
+```bash
+cd parking-backend
+./gradlew clean build
+```
+
+The build requires `TEST_DB_*` because the persistence tests apply the real
+Flyway migrations and verify PostgreSQL-specific constraints; H2 is not used.
 
 To verify the initial data:
 
@@ -122,10 +148,9 @@ psql -h localhost -p 5432 -U "$DB_USERNAME" -d parking_db \
   -c "SELECT code, active FROM parking_spots ORDER BY code;"
 ```
 
-The first migrations create only the `parking_spots` table and add spots
-`A1`-`A10` and `B1`-`B10`. Current occupancy is deliberately not stored on a
-parking spot; it will be derived from reservations and active visits in later
-stages.
+Migrations V1 and V2 create `parking_spots` and add spots `A1`-`A10` and
+`B1`-`B10`. Current occupancy is deliberately derived from reservations and
+active visits rather than stored as a second source of truth on a spot.
 
 Migration V3 adds users and their vehicles. Email uniqueness is
 case-insensitive, while normalized vehicle plates are globally unique so a
@@ -183,6 +208,27 @@ The remaining endpoints require `Authorization: Bearer <access-token>`:
 
 JWT access tokens expire after 60 minutes. There is no refresh-token or logout
 API in the current stage.
+
+With the application running, register and log in with real HTTP requests. The
+following example uses `jq` only to extract the token:
+
+```bash
+curl -sS -X POST 'http://localhost:8080/api/auth/register' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"driver@example.com","password":"SecurePassword123!"}'
+
+export TOKEN="$(curl -sS -X POST 'http://localhost:8080/api/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"driver@example.com","password":"SecurePassword123!"}' \
+  | jq -r '.accessToken')"
+
+export VEHICLE_ID="$(curl -sS -X POST 'http://localhost:8080/api/vehicles' \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"plateNumber":"01-KG-123-ABC"}' | jq -r '.id')"
+
+curl -sS 'http://localhost:8080/api/parking/spots' \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ### Reservation flow
 
@@ -451,6 +497,58 @@ Invoices are a history of charges, not successful bank transactions. This
 stage has no payment acceptance, `PAID` state, PDF, email receipt, refund, or
 automatic backfill. Historical rates for visits completed before V6 were never
 stored, so the application deliberately does not invent invoices for them.
+
+## Clean PostgreSQL verification
+
+The backend has been verified from an empty database owned by a non-superuser
+application role. On the first start Flyway installed `btree_gist`, applied
+V1-V7, created all tables, constraints, and indexes, seeded exactly 20 spots,
+and Hibernate completed `ddl-auto=validate`. A second start kept seven
+successful migration rows and 20 spots, demonstrating that migrations and
+seed data were not repeated.
+
+You can verify the same properties after the first local start:
+
+```bash
+psql -h localhost -p 5432 -U "$DB_USERNAME" -d parking_db \
+  -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
+psql -h localhost -p 5432 -U "$DB_USERNAME" -d parking_db \
+  -c "SELECT extname FROM pg_extension WHERE extname = 'btree_gist';"
+psql -h localhost -p 5432 -U "$DB_USERNAME" -d parking_db \
+  -c "SELECT COUNT(*) FROM parking_spots;"
+```
+
+Expected results are seven successful migration rows (versions 1 through 7),
+one `btree_gist` row, and a parking spot count of 20. Restart with
+`./gradlew bootRun` and repeat the queries; the counts must remain unchanged.
+
+## Startup troubleshooting
+
+- **`DB_URL`, `DB_USERNAME`, or `DB_PASSWORD` cannot be resolved:** export all
+  mandatory database variables in the same shell that starts Gradle. A `.env`
+  file is only a reference and is not loaded automatically.
+- **Connection refused:** confirm PostgreSQL is running, the host/port in the
+  JDBC URL are correct, and the database exists.
+- **Password authentication failed:** verify that `DB_USERNAME` owns or can
+  connect to the selected database and that `DB_PASSWORD` matches that role.
+- **`JWT_SECRET_BASE64 must be configured` or secret-length error:** generate a
+  fresh value with `openssl rand -base64 32`; do not use the committed test key
+  for a running application.
+- **`btree_gist` is unavailable or permission is denied:** install the server's
+  contrib/extension package, make the application role the database owner, or
+  have an administrator create only that extension once as described above.
+- **Wrong Java or toolchain error:** ensure both `java -version` and the Gradle
+  toolchain resolve Java 21.
+- **REST preflight is rejected:** add the exact frontend origin, including its
+  scheme and port, to `PARKING_REST_ALLOWED_ORIGINS`; wildcard is intentionally
+  rejected.
+- **WebSocket handshake returns 403:** add the exact origin separately to
+  `PARKING_WEBSOCKET_ALLOWED_ORIGINS`, then reconnect with a valid JWT in the
+  STOMP `CONNECT` header.
+- **SMTP configuration error:** keep `MAIL_ENABLED=false` unless host and from
+  address (and both username/password when authenticated) are configured.
+- **Tests cannot start:** export all `TEST_DB_*` variables and verify they point
+  to a disposable database distinct from the application database.
 
 ## Continuous Integration
 

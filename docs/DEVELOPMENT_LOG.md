@@ -260,3 +260,47 @@
 - Documented the simple broker's single-instance, non-durable delivery model:
   missed messages are not replayed, so reconnecting clients must resynchronize
   from PostgreSQL through REST.
+
+## Stage 11 — Backend Hardening and Clean PostgreSQL Verification
+
+- Audited the complete REST surface, DTO boundaries, unified error mapping,
+  owner-scoped queries, JWT decoder, STOMP interceptor, reservation and visit
+  locks, invoice immutability, scheduler paths, mail outbox, and Java Time
+  rules. Existing PostgreSQL and integration coverage already exercises the
+  required hold, no-show, walk-in, concurrent exit, reminder, and WebSocket
+  races, so those modules were not rewritten.
+- Found one frontend-blocking integration defect: Spring Security had no REST
+  CORS configuration even though the WebSocket endpoint validated Origins.
+  Added a dedicated, validated REST origin list, allowed only the existing
+  `GET`, `POST`, and preflight methods plus `Authorization`/`Content-Type`, and
+  kept wildcard origins forbidden. Two MockMvc preflight tests and one
+  property-validation test reproduce and protect the fix.
+- Removed implicit runtime and test database connection defaults. Application
+  startup now requires `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; integration
+  tests require the separate `TEST_DB_*` variables. This makes an accidental
+  connection to an unrelated local database less likely and produces an
+  immediate configuration error when required settings are absent.
+- Verified a genuinely empty PostgreSQL 14 database owned by a temporary,
+  non-superuser application role. Flyway installed the trusted `btree_gist`
+  extension, applied V1-V7, created all seven domain tables plus the expected
+  constraints and partial indexes, seeded exactly 20 spots, and passed
+  Hibernate `ddl-auto=validate`. Restarting retained seven migration rows and
+  20 spots without reapplying seed data.
+- Exercised the clean instance through real HTTP: registration, login, bearer
+  JWT, vehicle creation, 20-spot listing, interval availability, hold creation
+  and confirmation, reservation history, walk-in entry, double-entry refusal,
+  exit, repeated-exit refusal, visit history, invoice history, and stable
+  repeated invoice reads. Negative checks returned the established
+  400/401/404/409 contracts and approved REST preflight headers.
+- Re-ran the complete PostgreSQL suite: 159 tests passed with no failures,
+  errors, or skips. The smoke subset remains 22/22 and still covers real JWT,
+  concurrency, invoice, no-show, fake-mail, and two-client STOMP scenarios;
+  the CI workflow itself did not need modification.
+- Expanded the employer-facing setup guide with exact PostgreSQL ownership and
+  `btree_gist` requirements, mandatory runtime/test variables, REST and
+  WebSocket Origin separation, registration/login examples, clean migration
+  verification, and concrete startup troubleshooting.
+- Remaining limitations are intentional: no refresh token, external message
+  broker, durable WebSocket history, exactly-once SMTP guarantee, payment
+  processing, or frontend. Within the documented single-backend architecture,
+  the server contracts are ready for the React client.
