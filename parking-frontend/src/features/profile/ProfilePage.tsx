@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Mail, ShieldCheck, UserRound } from 'lucide-react'
+import { CalendarDays, Mail, UserRound } from 'lucide-react'
 import { getErrorMessage } from '../../shared/api/client'
 import { formatDateTime } from '../../shared/lib/format'
 import { Card, PageHeader } from '../../shared/ui/Surface'
@@ -10,7 +10,7 @@ export function ProfilePage() {
   const profile = useQuery(profileQuery())
   return (
     <div className="grid gap-6">
-      <PageHeader title="Профиль" description="Данные вашего аккаунта. Редактирование профиля пока не поддерживается сервером." />
+      <PageHeader title="Профиль" />
       {profile.isPending ? <LoadingState /> : null}
       {profile.isError ? <ErrorState message={getErrorMessage(profile.error, 'Не удалось загрузить профиль.')} onRetry={() => profile.refetch()} /> : null}
       {profile.data ? (
@@ -23,7 +23,6 @@ export function ProfilePage() {
             <div><dt className="flex items-center gap-2 text-sm text-slate-500"><Mail className="size-4" /> Email</dt><dd className="mt-1 break-all font-medium">{profile.data.email}</dd></div>
             <div><dt className="flex items-center gap-2 text-sm text-slate-500"><CalendarDays className="size-4" /> Дата регистрации</dt><dd className="mt-1 font-medium">{formatDateTime(profile.data.createdAt)}</dd></div>
           </dl>
-          <p className="mt-6 flex items-start gap-2 rounded-xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"><ShieldCheck className="mt-0.5 size-5 shrink-0" /> Доступ к данным защищён токеном вашей текущей сессии.</p>
         </Card>
       ) : null}
     </div>

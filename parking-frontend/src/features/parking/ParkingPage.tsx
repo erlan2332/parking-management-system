@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DateTime } from 'luxon'
-import { CalendarClock, Info, Radio } from 'lucide-react'
+import { CalendarClock, Info } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getErrorMessage } from '../../shared/api/client'
@@ -103,7 +103,7 @@ export function ParkingPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Выберите парковочное место" description="Укажите автомобиль и время. Карта показывает доступность именно для выбранного интервала." />
+      <PageHeader title="Выберите парковочное место" />
       <Card>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Автомобиль">
@@ -140,7 +140,7 @@ export function ParkingPage() {
 
       <Card>
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div><h2 className="text-lg font-bold">Схема парковки</h2><p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Radio className="size-4 text-emerald-600" /> Обновляется через REST и WebSocket</p></div>
+          <h2 className="text-lg font-bold">Схема парковки</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Легенда статусов">
             {(Object.keys(parkingStatusLabels) as ParkingSpotStatus[]).map((status) => <span key={status} className="flex items-center gap-2 text-xs text-slate-600"><span className={`size-2.5 rounded-full ${legendTones[status]}`} />{parkingStatusLabels[status]}</span>)}
           </div>

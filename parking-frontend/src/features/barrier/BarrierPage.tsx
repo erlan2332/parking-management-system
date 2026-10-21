@@ -38,10 +38,10 @@ export function BarrierPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Шлагбаум" description="Выберите автомобиль и зафиксируйте реальный въезд или выезд. Время определяет сервер." />
+      <PageHeader title="Шлагбаум" />
       <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
         <Card className="h-fit">
-          <div className="flex items-center gap-3"><span className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700"><DoorOpen /></span><div><h2 className="font-bold">Симулятор проезда</h2><p className="text-sm text-slate-500">Без имитации оборудования</p></div></div>
+          <div className="flex items-center gap-3"><span className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700"><DoorOpen /></span><h2 className="font-bold">Симулятор проезда</h2></div>
           <div className="mt-6"><Field label="Автомобиль"><Select value={selectedVehicleId} onChange={(event) => { setVehicleId(event.target.value); setResult(null) }}><option value="">Выберите автомобиль</option>{vehicles.data?.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plateNumber}</option>)}</Select></Field></div>
           {visits.isPending || vehicles.isPending ? <LoadingState label="Проверяем статус автомобиля…" /> : null}
           {selectedVehicle && !visits.isPending ? (

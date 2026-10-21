@@ -30,7 +30,7 @@ export function VehiclesPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Мои автомобили" description="Добавьте номер автомобиля, чтобы выбирать места и пользоваться шлагбаумом." />
+      <PageHeader title="Мои автомобили" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <h2 className="text-lg font-bold">Зарегистрированные автомобили</h2>
@@ -50,7 +50,6 @@ export function VehiclesPage() {
         </Card>
         <Card className="h-fit">
           <h2 className="text-lg font-bold">Добавить автомобиль</h2>
-          <p className="mt-1 text-sm text-slate-500">Пробелы и дефисы будут нормализованы сервером.</p>
           <form className="mt-5 grid gap-4" onSubmit={submit}>
             <Field label="Государственный номер">
               <Input required maxLength={64} value={plate} onChange={(event) => setPlate(event.target.value)} placeholder="01 KG 123 ABC" autoComplete="off" />

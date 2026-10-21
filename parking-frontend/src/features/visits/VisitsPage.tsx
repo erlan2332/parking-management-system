@@ -16,7 +16,7 @@ export function VisitsPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="История парковки" description="Все фактические въезды и выезды. Активный визит отображается первым." />
+      <PageHeader title="История парковки" />
       <Card className="overflow-hidden p-0">
         {visits.isPending ? <LoadingState /> : null}
         {visits.isError ? <ErrorState message={getErrorMessage(visits.error, 'Не удалось загрузить историю парковки.')} onRetry={() => visits.refetch()} /> : null}

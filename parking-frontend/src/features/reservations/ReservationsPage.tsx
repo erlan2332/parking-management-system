@@ -38,7 +38,7 @@ export function ReservationsPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Мои бронирования" description="Подтверждённые, завершённые и отменённые парковки в одном списке." />
+      <PageHeader title="Мои бронирования" />
       <Card>
         {reservations.isPending ? <LoadingState /> : null}
         {reservations.isError ? <ErrorState message={getErrorMessage(reservations.error, 'Не удалось загрузить бронирования.')} onRetry={() => reservations.refetch()} /> : null}
