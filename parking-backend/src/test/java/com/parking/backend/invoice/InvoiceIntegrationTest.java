@@ -1,19 +1,26 @@
 package com.parking.backend.invoice;
 
-import com.parking.backend.barrier.BarrierExitResult;
-import com.parking.backend.barrier.BarrierService;
+import com.parking.backend.support.MutableClock;
+
+import com.parking.backend.invoice.entity.InvoiceEntity;
+import com.parking.backend.invoice.model.InvoiceStatus;
+import com.parking.backend.invoice.repository.InvoiceRepository;
+import com.parking.backend.invoice.service.InvoiceService;
+
+import com.parking.backend.barrier.model.BarrierExitResult;
+import com.parking.backend.barrier.service.BarrierService;
 import com.parking.backend.common.exception.NoActiveVisitException;
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.pricing.ParkingCostBreakdown;
-import com.parking.backend.pricing.ParkingPricingProperties;
-import com.parking.backend.pricing.ParkingPricingService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.visit.ParkingVisitEntity;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.pricing.model.ParkingCostBreakdown;
+import com.parking.backend.pricing.config.ParkingPricingProperties;
+import com.parking.backend.pricing.service.ParkingPricingService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.visit.entity.ParkingVisitEntity;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -42,7 +49,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -366,35 +372,4 @@ class InvoiceIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }

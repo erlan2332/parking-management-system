@@ -1,7 +1,12 @@
 package com.parking.backend.vehicle;
 
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.vehicle.service.PlateNormalizer;
+import com.parking.backend.vehicle.service.VehicleService;
+
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,12 +127,15 @@ class UserVehiclePersistenceTest {
 		UserEntity user = saveUser("search@example.com");
 		VehicleEntity createdVehicle = vehicleService.addVehicle(user.getId(), "01-KG-123-ABC");
 
-		Optional<VehicleEntity> foundVehicle = vehicleService.findByPlate(" 01 kg 123 abc ");
+		String normalizedPlate = plateNormalizer.normalize(" 01 kg 123 abc ");
+		Optional<VehicleEntity> foundVehicle = vehicleRepository.findByNormalizedPlateAndUser_Id(
+				normalizedPlate,
+				user.getId()
+		);
 
 		assertTrue(foundVehicle.isPresent());
 		assertEquals(createdVehicle.getId(), foundVehicle.orElseThrow().getId());
-		assertTrue(vehicleService.plateExists("01 kg 123 abc"));
-		assertTrue(vehicleService.belongsToUser(createdVehicle.getId(), user.getId()));
+		assertTrue(vehicleRepository.existsByNormalizedPlate(normalizedPlate));
 	}
 
 	@Test

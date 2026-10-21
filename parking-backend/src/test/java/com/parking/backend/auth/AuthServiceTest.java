@@ -1,14 +1,12 @@
 package com.parking.backend.auth;
 
-import com.parking.backend.auth.dto.AuthResponse;
-import com.parking.backend.auth.dto.LoginRequest;
-import com.parking.backend.auth.dto.RegisterRequest;
-import com.parking.backend.auth.dto.RegisteredUserResponse;
+import com.parking.backend.auth.service.AuthService;
+
 import com.parking.backend.common.exception.EmailAlreadyExistsException;
 import com.parking.backend.common.exception.InvalidCredentialsException;
-import com.parking.backend.security.JwtService;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
+import com.parking.backend.security.service.JwtService;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,14 +57,12 @@ class AuthServiceTest {
 					return user;
 				});
 
-		RegisteredUserResponse response = authService.register(
-				new RegisterRequest(" Driver@Example.COM ", "SecurePassword123!")
-		);
+		UserEntity response = authService.register(" Driver@Example.COM ", "SecurePassword123!");
 
 		ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
 		verify(userRepository).saveAndFlush(userCaptor.capture());
-		assertEquals(42L, response.id());
-		assertEquals("driver@example.com", response.email());
+		assertEquals(42L, response.getId());
+		assertEquals("driver@example.com", response.getEmail());
 		assertEquals("bcrypt-hash", userCaptor.getValue().getPasswordHash());
 	}
 
@@ -76,7 +72,7 @@ class AuthServiceTest {
 
 		assertThrows(
 				EmailAlreadyExistsException.class,
-				() -> authService.register(new RegisterRequest("driver@example.com", "SecurePassword123!"))
+				() -> authService.register("driver@example.com", "SecurePassword123!")
 		);
 	}
 
@@ -95,7 +91,7 @@ class AuthServiceTest {
 
 		assertThrows(
 				EmailAlreadyExistsException.class,
-				() -> authService.register(new RegisterRequest("driver@example.com", "SecurePassword123!"))
+				() -> authService.register("driver@example.com", "SecurePassword123!")
 		);
 	}
 
@@ -110,7 +106,7 @@ class AuthServiceTest {
 
 		DataIntegrityViolationException thrownException = assertThrows(
 				DataIntegrityViolationException.class,
-				() -> authService.register(new RegisterRequest("driver@example.com", "SecurePassword123!"))
+				() -> authService.register("driver@example.com", "SecurePassword123!")
 		);
 
 		assertSame(databaseException, thrownException);
@@ -124,13 +120,13 @@ class AuthServiceTest {
 		when(passwordEncoder.matches("SecurePassword123!", "bcrypt-hash")).thenReturn(true);
 		when(jwtService.issueToken(42L)).thenReturn(new JwtService.IssuedToken("signed-token", 3600));
 
-		AuthResponse response = authService.login(
-				new LoginRequest(" Driver@Example.COM ", "SecurePassword123!")
+		JwtService.IssuedToken response = authService.login(
+				" Driver@Example.COM ",
+				"SecurePassword123!"
 		);
 
-		assertEquals("signed-token", response.accessToken());
-		assertEquals("Bearer", response.tokenType());
-		assertEquals(3600, response.expiresIn());
+		assertEquals("signed-token", response.value());
+		assertEquals(3600, response.expiresInSeconds());
 	}
 
 	@Test
@@ -139,7 +135,7 @@ class AuthServiceTest {
 
 		assertThrows(
 				InvalidCredentialsException.class,
-				() -> authService.login(new LoginRequest("missing@example.com", "WrongPassword123!"))
+				() -> authService.login("missing@example.com", "WrongPassword123!")
 		);
 
 		UserEntity user = new UserEntity("driver@example.com", "bcrypt-hash");
@@ -148,7 +144,7 @@ class AuthServiceTest {
 
 		assertThrows(
 				InvalidCredentialsException.class,
-				() -> authService.login(new LoginRequest("driver@example.com", "WrongPassword123!"))
+				() -> authService.login("driver@example.com", "WrongPassword123!")
 		);
 	}
 }

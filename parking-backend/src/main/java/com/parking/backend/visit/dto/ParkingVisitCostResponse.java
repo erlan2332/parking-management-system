@@ -1,8 +1,5 @@
 package com.parking.backend.visit.dto;
 
-import com.parking.backend.pricing.ParkingCostBreakdown;
-import com.parking.backend.visit.ParkingVisitEntity;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -20,21 +17,4 @@ public record ParkingVisitCostResponse(
 		BigDecimal nightCost,
 		BigDecimal totalCost
 ) {
-
-	public static ParkingVisitCostResponse from(ParkingVisitEntity visit, ParkingCostBreakdown cost) {
-		return new ParkingVisitCostResponse(
-				visit.getId(),
-				cost.currency(),
-				visit.getEnteredAt(),
-				visit.getExitedAt(),
-				cost.totalDurationSeconds(),
-				cost.dayDurationSeconds(),
-				cost.nightDurationSeconds(),
-				cost.dayRatePerMinute(),
-				cost.nightRatePerMinute(),
-				cost.dayCost(),
-				cost.nightCost(),
-				cost.totalCost()
-		);
-	}
 }

@@ -1,5 +1,10 @@
 package com.parking.backend.parking;
 
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.model.ParkingSpotAvailability;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.parking.service.ParkingSpotService;
+
 import jakarta.persistence.EntityManager;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;

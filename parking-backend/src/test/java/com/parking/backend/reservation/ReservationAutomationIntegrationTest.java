@@ -1,17 +1,25 @@
 package com.parking.backend.reservation;
 
-import com.parking.backend.barrier.BarrierService;
+import com.parking.backend.support.MutableClock;
+
+import com.parking.backend.reservation.entity.ReservationEntity;
+import com.parking.backend.reservation.model.ReservationStatus;
+import com.parking.backend.reservation.repository.ReservationRepository;
+import com.parking.backend.reservation.service.ReservationService;
+import com.parking.backend.reservation.service.ReservationExpirationService;
+
+import com.parking.backend.barrier.service.BarrierService;
 import com.parking.backend.common.exception.ReservationEntryConflictException;
-import com.parking.backend.parking.ParkingSpotAvailability;
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.parking.ParkingSpotService;
-import com.parking.backend.parking.ParkingSpotStatus;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
-import com.parking.backend.visit.ParkingVisitRepository;
+import com.parking.backend.parking.model.ParkingSpotAvailability;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.parking.service.ParkingSpotService;
+import com.parking.backend.parking.model.ParkingSpotStatus;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
+import com.parking.backend.visit.repository.ParkingVisitRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -29,14 +37,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,6 +58,8 @@ class ReservationAutomationIntegrationTest {
 
 	@Autowired
 	private ReservationService reservationService;
+	@Autowired
+	private ReservationExpirationService reservationExpirationService;
 	@Autowired
 	private ReservationRepository reservationRepository;
 	@Autowired
@@ -96,13 +104,13 @@ class ReservationAutomationIntegrationTest {
 		);
 
 		clock.set(reservation.getStartAt().plus(Duration.ofMinutes(15)).minusSeconds(1));
-		assertEquals(0, reservationService.expireNoShows());
+		assertEquals(0, reservationExpirationService.expireDueNoShows());
 		assertEquals(ReservationStatus.ACTIVE, reload(reservation).getStatus());
 
 		clock.advance(Duration.ofSeconds(1));
-		assertEquals(1, reservationService.expireNoShows());
+		assertEquals(1, reservationExpirationService.expireDueNoShows());
 		assertEquals(ReservationStatus.EXPIRED, reload(reservation).getStatus());
-		assertEquals(0, reservationService.expireNoShows());
+		assertEquals(0, reservationExpirationService.expireDueNoShows());
 		assertEquals(
 				ReservationStatus.EXPIRED,
 				reservationService.getMyReservations(driver.user().getId()).getFirst().getStatus()
@@ -121,7 +129,7 @@ class ReservationAutomationIntegrationTest {
 
 		clock.set(reservation.getEndAt());
 
-		assertEquals(1, reservationService.expireNoShows());
+		assertEquals(1, reservationExpirationService.expireDueNoShows());
 		assertEquals(ReservationStatus.EXPIRED, reload(reservation).getStatus());
 	}
 
@@ -147,7 +155,7 @@ class ReservationAutomationIntegrationTest {
 
 		clock.set(cancelled.getEndAt().plus(Duration.ofMinutes(1)));
 
-		assertEquals(0, reservationService.expireNoShows());
+		assertEquals(0, reservationExpirationService.expireDueNoShows());
 		assertEquals(ReservationStatus.CHECKED_IN, reload(checkedIn).getStatus());
 		assertEquals(ReservationStatus.CANCELLED, reload(cancelled).getStatus());
 	}
@@ -230,7 +238,7 @@ class ReservationAutomationIntegrationTest {
 			Future<Integer> cleanup = executor.submit(() -> {
 				ready.countDown();
 				startGate.await();
-				return reservationService.expireNoShows();
+				return reservationExpirationService.expireDueNoShows();
 			});
 			assertTrue(ready.await(5, TimeUnit.SECONDS));
 			startGate.countDown();
@@ -301,35 +309,4 @@ class ReservationAutomationIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }

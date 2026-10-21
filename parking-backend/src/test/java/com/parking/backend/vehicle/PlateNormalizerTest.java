@@ -1,5 +1,7 @@
 package com.parking.backend.vehicle;
 
+import com.parking.backend.vehicle.service.PlateNormalizer;
+
 import com.parking.backend.common.exception.InvalidPlateNumberException;
 import org.junit.jupiter.api.Test;
 

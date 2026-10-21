@@ -1,7 +1,5 @@
 package com.parking.backend.user.dto;
 
-import com.parking.backend.user.UserEntity;
-
 import java.time.Instant;
 
 public record UserResponse(
@@ -9,8 +7,4 @@ public record UserResponse(
 		String email,
 		Instant createdAt
 ) {
-
-	public static UserResponse from(UserEntity user) {
-		return new UserResponse(user.getId(), user.getEmail(), user.getCreatedAt());
-	}
 }

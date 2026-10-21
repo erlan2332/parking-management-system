@@ -1,0 +1,12 @@
+package com.parking.backend.realtime.event;
+
+public enum ParkingChangeReason {
+	HOLD_CREATED,
+	HOLD_RELEASED,
+	HOLD_EXPIRED,
+	RESERVATION_CONFIRMED,
+	RESERVATION_CANCELLED,
+	RESERVATION_EXPIRED,
+	VEHICLE_ENTERED,
+	VEHICLE_EXITED
+}

@@ -1,16 +1,27 @@
 package com.parking.backend.notification;
 
-import com.parking.backend.barrier.BarrierService;
-import com.parking.backend.parking.ParkingSpotEntity;
-import com.parking.backend.parking.ParkingSpotRepository;
-import com.parking.backend.reservation.ReservationEntity;
-import com.parking.backend.reservation.ReservationRepository;
-import com.parking.backend.reservation.ReservationService;
-import com.parking.backend.reservation.ReservationStatus;
-import com.parking.backend.user.UserEntity;
-import com.parking.backend.user.UserRepository;
-import com.parking.backend.vehicle.VehicleEntity;
-import com.parking.backend.vehicle.VehicleRepository;
+import com.parking.backend.support.MutableClock;
+
+import com.parking.backend.notification.entity.ReservationNotificationEntity;
+import com.parking.backend.notification.model.ReservationNotificationStatus;
+import com.parking.backend.notification.model.ReservationNotificationType;
+import com.parking.backend.notification.model.ReservationReminderMessage;
+import com.parking.backend.notification.repository.ReservationNotificationRepository;
+import com.parking.backend.notification.sender.ReservationEmailSender;
+import com.parking.backend.notification.service.ReservationReminderService;
+
+import com.parking.backend.barrier.service.BarrierService;
+import com.parking.backend.parking.entity.ParkingSpotEntity;
+import com.parking.backend.parking.repository.ParkingSpotRepository;
+import com.parking.backend.reservation.entity.ReservationEntity;
+import com.parking.backend.reservation.repository.ReservationRepository;
+import com.parking.backend.reservation.service.ReservationService;
+import com.parking.backend.reservation.service.ReservationExpirationService;
+import com.parking.backend.reservation.model.ReservationStatus;
+import com.parking.backend.user.entity.UserEntity;
+import com.parking.backend.user.repository.UserRepository;
+import com.parking.backend.vehicle.entity.VehicleEntity;
+import com.parking.backend.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -28,7 +39,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -58,6 +68,8 @@ class ReservationReminderIntegrationTest {
 	private ReservationNotificationRepository notificationRepository;
 	@Autowired
 	private ReservationService reservationService;
+	@Autowired
+	private ReservationExpirationService reservationExpirationService;
 	@Autowired
 	private ReservationRepository reservationRepository;
 	@Autowired
@@ -126,7 +138,7 @@ class ReservationReminderIntegrationTest {
 		Driver expiredDriver = createDriver("expired-no-mail@example.com", "01KG944AAA");
 		ReservationEntity expired = createConfirmedReservation(expiredDriver, spot("A3"));
 		clock.set(expired.getStartAt().plus(Duration.ofMinutes(15)));
-		reservationService.expireNoShows();
+		reservationExpirationService.expireDueNoShows();
 
 		clock.set(active.getEndAt().minus(Duration.ofMinutes(10)));
 
@@ -395,35 +407,4 @@ class ReservationReminderIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }

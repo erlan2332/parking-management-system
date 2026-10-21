@@ -1,5 +1,10 @@
 package com.parking.backend.realtime;
 
+import com.parking.backend.realtime.config.ParkingWebSocketConfig;
+import com.parking.backend.realtime.event.ParkingAvailabilityChangedEvent;
+import com.parking.backend.realtime.event.ParkingChangeEventListener;
+import com.parking.backend.realtime.event.ParkingChangeReason;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 

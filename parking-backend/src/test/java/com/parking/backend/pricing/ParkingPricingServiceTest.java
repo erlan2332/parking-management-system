@@ -1,5 +1,9 @@
 package com.parking.backend.pricing;
 
+import com.parking.backend.pricing.config.ParkingPricingProperties;
+import com.parking.backend.pricing.model.ParkingCostBreakdown;
+import com.parking.backend.pricing.service.ParkingPricingService;
+
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -86,6 +90,21 @@ class ParkingPricingServiceTest {
 		assertEquals(new BigDecimal("0.025000"), acrossBoundary.dayCost());
 		assertEquals(new BigDecimal("0.025000"), acrossBoundary.nightCost());
 		assertEquals(new BigDecimal("0.05"), acrossBoundary.totalCost());
+	}
+
+	@Test
+	void assignsTheWholeBillableSecondToTheLargestFractionalTariffSegment() {
+		ParkingCostBreakdown equalFractions = pricingService.calculate(
+				instant("2026-12-01T19:59:59.250+06:00"),
+				instant("2026-12-01T20:00:00.750+06:00")
+		);
+		ParkingCostBreakdown largerNightFraction = pricingService.calculate(
+				instant("2026-12-01T19:59:59.800+06:00"),
+				instant("2026-12-01T20:00:00.900+06:00")
+		);
+
+		assertBreakdown(equalFractions, 1, 1, 0, "0.033333", "0.000000", "0.03");
+		assertBreakdown(largerNightFraction, 1, 0, 1, "0.000000", "0.016667", "0.02");
 	}
 
 	@Test
