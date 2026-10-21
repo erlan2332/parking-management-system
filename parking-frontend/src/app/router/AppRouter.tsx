@@ -2,11 +2,13 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from '../../features/auth/LoginPage'
 import { PublicOnly, RequireAuth } from '../../features/auth/RouteGuards'
 import { RegisterPage } from '../../features/auth/RegisterPage'
+import { BarrierPage } from '../../features/barrier/BarrierPage'
+import { InvoicesPage } from '../../features/invoices/InvoicesPage'
 import { ProfilePage } from '../../features/profile/ProfilePage'
 import { ParkingPage } from '../../features/parking/ParkingPage'
 import { ReservationsPage } from '../../features/reservations/ReservationsPage'
 import { VehiclesPage } from '../../features/vehicles/VehiclesPage'
-import { PlaceholderPage } from '../../shared/ui/PlaceholderPage'
+import { VisitsPage } from '../../features/visits/VisitsPage'
 import { AppLayout } from '../layout/AppLayout'
 
 export function AppRouter() {
@@ -21,9 +23,9 @@ export function AppRouter() {
           <Route path="/parking" element={<ParkingPage />} />
           <Route path="/reservations" element={<ReservationsPage />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
-          <Route path="/barrier" element={<PlaceholderPage title="Шлагбаум" />} />
-          <Route path="/visits" element={<PlaceholderPage title="История парковки" />} />
-          <Route path="/invoices" element={<PlaceholderPage title="Счета" />} />
+          <Route path="/barrier" element={<BarrierPage />} />
+          <Route path="/visits" element={<VisitsPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
