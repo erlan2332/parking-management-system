@@ -4,6 +4,7 @@ import com.parking.backend.common.exception.InvalidReservationRequestException;
 import com.parking.backend.common.exception.ReservationConflictException;
 import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
+import com.parking.backend.realtime.ParkingChangePublisher;
 import com.parking.backend.user.UserEntity;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
@@ -46,6 +47,8 @@ class ReservationServiceTest {
 	private VehicleRepository vehicleRepository;
 	@Mock
 	private ParkingVisitRepository parkingVisitRepository;
+	@Mock
+	private ParkingChangePublisher changePublisher;
 
 	private ReservationService reservationService;
 	private UserEntity user;
@@ -144,6 +147,7 @@ class ReservationServiceTest {
 				vehicleRepository,
 				parkingVisitRepository,
 				new ReservationEntryPolicy(),
+				changePublisher,
 				Clock.fixed(instant, ZoneOffset.UTC)
 		);
 	}

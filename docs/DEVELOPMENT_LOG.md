@@ -231,3 +231,32 @@
 - Documented the unavoidable SMTP acknowledgement gap: database uniqueness and
   row claiming prevent normal concurrent duplicates, but a process failure
   after SMTP acceptance and before the `SENT` commit can still cause a retry.
+
+## Stage 10 — Authenticated Real-time Parking Updates
+
+- Added a native `/ws/parking` endpoint with STOMP and Spring's in-memory simple
+  broker. Authorized clients subscribe only to `/topic/parking/changes`; no
+  SockJS fallback, external broker, or parallel state store was introduced.
+- Reused the REST `JwtDecoder` in an inbound channel interceptor. JWT is
+  required in the STOMP `CONNECT` header, while anonymous subscriptions,
+  unknown destinations, client `SEND` commands, invalid signatures, expired
+  tokens, and unapproved Origins are rejected.
+- Added a minimal interval-independent event containing only reason, spot ID,
+  spot code, and occurrence time. Clients treat it as an invalidation hint and
+  reload their own interval through the existing REST availability endpoint.
+- Publish internal events inside business transactions and bridge them to STOMP
+  with an `AFTER_COMMIT` listener. Rollbacks emit nothing, while broker errors
+  are isolated from already committed reservation, visit, invoice, and cleanup
+  work.
+- Integrated actual hold creation/release/confirmation/expiration,
+  cancellation, no-show, walk-in or reserved entry, and invoice-backed exit.
+  Idempotent calls and repeated scheduler passes do not emit false changes.
+- Reworked hold and no-show cleanup to select bounded, locked reservation IDs
+  before entity transitions. This retains PostgreSQL `SKIP LOCKED`, preserves
+  lock ordering, and provides the exact affected spot for each committed event.
+- Added real random-port WebSocket tests with two STOMP clients plus controlled
+  JWT, Origin, forbidden destination/SEND, lifecycle, rollback, and reconnect
+  security scenarios. No external broker or timing sleeps are required.
+- Documented the simple broker's single-instance, non-durable delivery model:
+  missed messages are not replayed, so reconnecting clients must resynchronize
+  from PostgreSQL through REST.

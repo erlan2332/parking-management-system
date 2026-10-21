@@ -8,6 +8,8 @@ import com.parking.backend.common.exception.VehicleNotFoundException;
 import com.parking.backend.common.persistence.DatabaseConstraintViolationDetector;
 import com.parking.backend.parking.ParkingSpotEntity;
 import com.parking.backend.parking.ParkingSpotRepository;
+import com.parking.backend.realtime.ParkingChangePublisher;
+import com.parking.backend.realtime.ParkingChangeReason;
 import com.parking.backend.vehicle.VehicleEntity;
 import com.parking.backend.vehicle.VehicleRepository;
 import com.parking.backend.visit.ParkingVisitRepository;
@@ -26,6 +28,7 @@ import java.util.Set;
 public class ReservationService {
 
 	private static final Duration HOLD_DURATION = Duration.ofMinutes(3);
+	private static final int HOLD_EXPIRY_BATCH_SIZE = 100;
 	private static final int NO_SHOW_BATCH_SIZE = 100;
 	private static final String SPOT_INTERVAL_CONSTRAINT = "ex_reservations_spot_interval";
 	private static final String VEHICLE_INTERVAL_CONSTRAINT = "ex_reservations_vehicle_interval";
@@ -45,6 +48,7 @@ public class ReservationService {
 	private final VehicleRepository vehicleRepository;
 	private final ParkingVisitRepository parkingVisitRepository;
 	private final ReservationEntryPolicy entryPolicy;
+	private final ParkingChangePublisher changePublisher;
 	private final Clock clock;
 
 	public ReservationService(
@@ -53,6 +57,7 @@ public class ReservationService {
 			VehicleRepository vehicleRepository,
 			ParkingVisitRepository parkingVisitRepository,
 			ReservationEntryPolicy entryPolicy,
+			ParkingChangePublisher changePublisher,
 			Clock clock
 	) {
 		this.reservationRepository = reservationRepository;
@@ -60,6 +65,7 @@ public class ReservationService {
 		this.vehicleRepository = vehicleRepository;
 		this.parkingVisitRepository = parkingVisitRepository;
 		this.entryPolicy = entryPolicy;
+		this.changePublisher = changePublisher;
 		this.clock = clock;
 	}
 
@@ -89,13 +95,19 @@ public class ReservationService {
 		VehicleEntity vehicle = vehicleRepository.findOwnedByIdForUpdate(vehicleId, userId)
 				.orElseThrow(() -> new VehicleNotFoundException(vehicleId));
 
-		reservationRepository.expireConflictingHolds(spotId, vehicleId, start, end, now);
-		reservationRepository.expireConflictingNoShows(
+		expireHolds(reservationRepository.findConflictingHoldIdsForUpdate(
+				spotId,
+				vehicleId,
+				start,
+				end,
+				now
+		));
+		expireNoShows(reservationRepository.findConflictingNoShowIdsForUpdate(
 				spotId,
 				vehicleId,
 				now,
 				entryPolicy.activeStartCutoff(now)
-		);
+		));
 		if (!reservationRepository.findBlockingConflicts(
 				spotId,
 				vehicleId,
@@ -122,7 +134,9 @@ public class ReservationService {
 		);
 
 		try {
-			return reservationRepository.saveAndFlush(hold);
+			ReservationEntity savedHold = reservationRepository.saveAndFlush(hold);
+			publish(ParkingChangeReason.HOLD_CREATED, savedHold);
+			return savedHold;
 		} catch (DataIntegrityViolationException exception) {
 			if (isExclusionConflict(exception)) {
 				throw new ReservationConflictException(
@@ -147,10 +161,12 @@ public class ReservationService {
 		Instant now = clock.instant();
 		if (hold.isExpiredHoldAt(now) || !now.isBefore(hold.getStartAt())) {
 			hold.expireHold();
+			publish(ParkingChangeReason.HOLD_EXPIRED, hold);
 			throw new ReservationConflictException("Hold has expired");
 		}
 
 		hold.confirm(now);
+		publish(ParkingChangeReason.RESERVATION_CONFIRMED, hold);
 		return hold;
 	}
 
@@ -167,16 +183,18 @@ public class ReservationService {
 		Instant now = clock.instant();
 		if (hold.isExpiredHoldAt(now)) {
 			hold.expireHold();
+			publish(ParkingChangeReason.HOLD_EXPIRED, hold);
 			throw new ReservationConflictException("Hold has expired");
 		}
 
 		hold.release(now);
+		publish(ParkingChangeReason.HOLD_RELEASED, hold);
 		return hold;
 	}
 
 	@Transactional
 	public List<ReservationEntity> getMyActiveHolds(Long userId) {
-		reservationRepository.expireHoldsForUser(userId, clock.instant());
+		expireHolds(reservationRepository.findHoldIdsForUserForUpdate(userId, clock.instant()));
 		return reservationRepository.findAllByUser_IdAndStatusOrderByCreatedAtAscIdAsc(
 				userId,
 				ReservationStatus.HELD
@@ -186,7 +204,11 @@ public class ReservationService {
 	@Transactional
 	public List<ReservationEntity> getMyReservations(Long userId) {
 		Instant now = clock.instant();
-		reservationRepository.expireNoShowsForUser(userId, now, entryPolicy.activeStartCutoff(now));
+		expireNoShows(reservationRepository.findNoShowIdsForUserForUpdate(
+				userId,
+				now,
+				entryPolicy.activeStartCutoff(now)
+		));
 		return reservationRepository.findAllByUser_IdAndStatusInOrderByStartAtAscIdAsc(
 				userId,
 				CONFIRMED_HISTORY_STATUSES
@@ -209,22 +231,54 @@ public class ReservationService {
 		}
 
 		reservation.cancel(now);
+		publish(ParkingChangeReason.RESERVATION_CANCELLED, reservation);
 		return reservation;
 	}
 
 	@Transactional
 	public int expireHolds() {
-		return reservationRepository.expireAllHolds(clock.instant());
+		return expireHolds(reservationRepository.findDueHoldIdsForUpdate(
+				clock.instant(),
+				HOLD_EXPIRY_BATCH_SIZE
+		));
 	}
 
 	@Transactional
 	public int expireNoShows() {
 		Instant now = clock.instant();
-		return reservationRepository.expireDueNoShows(
+		return expireNoShows(reservationRepository.findDueNoShowIdsForUpdate(
 				now,
 				entryPolicy.activeStartCutoff(now),
 				NO_SHOW_BATCH_SIZE
-		);
+		));
+	}
+
+	private int expireHolds(List<Long> reservationIds) {
+		int expiredCount = 0;
+		for (ReservationEntity reservation : reservationRepository.findAllById(reservationIds)) {
+			if (reservation.getStatus() == ReservationStatus.HELD) {
+				reservation.expireHold();
+				publish(ParkingChangeReason.HOLD_EXPIRED, reservation);
+				expiredCount++;
+			}
+		}
+		return expiredCount;
+	}
+
+	private int expireNoShows(List<Long> reservationIds) {
+		int expiredCount = 0;
+		for (ReservationEntity reservation : reservationRepository.findAllById(reservationIds)) {
+			if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+				reservation.expireNoShow();
+				publish(ParkingChangeReason.RESERVATION_EXPIRED, reservation);
+				expiredCount++;
+			}
+		}
+		return expiredCount;
+	}
+
+	private void publish(ParkingChangeReason reason, ReservationEntity reservation) {
+		changePublisher.publish(reason, reservation.getSpot().getId(), reservation.getSpot().getCode());
 	}
 
 	private ReservationEntity findOwnedForUpdate(Long reservationId, Long userId) {
