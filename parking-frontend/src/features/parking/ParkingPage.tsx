@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DateTime } from 'luxon'
-import { CalendarClock, Info } from 'lucide-react'
+import { CalendarClock } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getErrorMessage } from '../../shared/api/client'
@@ -117,7 +117,6 @@ export function ParkingPage() {
           <Field label="Окончание" error={intervalError ?? undefined}><Input type="time" value={effectiveEndTime} onChange={(event) => setEndTime(event.target.value)} disabled={Boolean(activeHold)} /></Field>
         </div>
         {!vehicles.isPending && vehicles.data?.length === 0 ? <p className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">Сначала <Link to="/vehicles" className="font-semibold underline">добавьте автомобиль</Link>, чтобы забронировать место.</p> : null}
-        {activeHold ? <p className="mt-4 flex items-center gap-2 text-sm text-amber-700"><Info className="size-4" /> Завершите текущее удержание, прежде чем менять автомобиль или время.</p> : null}
       </Card>
 
       <Card>

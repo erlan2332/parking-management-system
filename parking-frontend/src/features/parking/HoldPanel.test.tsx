@@ -42,7 +42,7 @@ describe('HoldPanel', () => {
 
     expect(screen.getByRole('dialog', { name: 'Место A2 закреплено за вами' })).toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: 'Оставшееся время удержания' })).toHaveAttribute('aria-valuenow', '67')
-    expect(screen.getAllByText('02:00')).toHaveLength(2)
+    expect(screen.getByText('02:00')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Подтвердить бронирование/ }))
     expect(onConfirm).toHaveBeenCalledOnce()
