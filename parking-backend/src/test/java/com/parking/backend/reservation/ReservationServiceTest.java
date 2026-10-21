@@ -5,6 +5,7 @@ import com.parking.backend.reservation.model.ReservationStatus;
 import com.parking.backend.reservation.policy.ReservationEntryPolicy;
 import com.parking.backend.reservation.repository.ReservationRepository;
 import com.parking.backend.reservation.service.ReservationService;
+import com.parking.backend.reservation.service.ReservationExpirationService;
 
 import com.parking.backend.common.exception.InvalidReservationRequestException;
 import com.parking.backend.common.exception.ReservationConflictException;
@@ -55,6 +56,8 @@ class ReservationServiceTest {
 	private ParkingVisitRepository parkingVisitRepository;
 	@Mock
 	private ParkingChangePublisher changePublisher;
+	@Mock
+	private ReservationExpirationService expirationService;
 
 	private ReservationService reservationService;
 	private UserEntity user;
@@ -154,6 +157,7 @@ class ReservationServiceTest {
 				parkingVisitRepository,
 				new ReservationEntryPolicy(),
 				changePublisher,
+				expirationService,
 				Clock.fixed(instant, ZoneOffset.UTC)
 		);
 	}

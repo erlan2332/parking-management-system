@@ -35,8 +35,6 @@ import java.util.Set;
 public class ReservationService {
 
 	private static final Duration HOLD_DURATION = Duration.ofMinutes(3);
-	private static final int HOLD_EXPIRY_BATCH_SIZE = 100;
-	private static final int NO_SHOW_BATCH_SIZE = 100;
 	private static final String SPOT_INTERVAL_CONSTRAINT = "ex_reservations_spot_interval";
 	private static final String VEHICLE_INTERVAL_CONSTRAINT = "ex_reservations_vehicle_interval";
 	private static final Set<ReservationStatus> PERSISTENT_BLOCKING_STATUSES = Set.of(
@@ -56,6 +54,7 @@ public class ReservationService {
 	private final ParkingVisitRepository parkingVisitRepository;
 	private final ReservationEntryPolicy entryPolicy;
 	private final ParkingChangePublisher changePublisher;
+	private final ReservationExpirationService expirationService;
 	private final Clock clock;
 
 	@Transactional
@@ -84,14 +83,14 @@ public class ReservationService {
 		VehicleEntity vehicle = vehicleRepository.findOwnedByIdForUpdate(vehicleId, userId)
 				.orElseThrow(() -> new VehicleNotFoundException(vehicleId));
 
-		expireHolds(reservationRepository.findConflictingHoldIdsForUpdate(
+		expirationService.expireHolds(reservationRepository.findConflictingHoldIdsForUpdate(
 				spotId,
 				vehicleId,
 				start,
 				end,
 				now
 		));
-		expireNoShows(reservationRepository.findConflictingNoShowIdsForUpdate(
+		expirationService.expireNoShows(reservationRepository.findConflictingNoShowIdsForUpdate(
 				spotId,
 				vehicleId,
 				now,
@@ -183,7 +182,9 @@ public class ReservationService {
 
 	@Transactional
 	public List<ReservationEntity> getMyActiveHolds(Long userId) {
-		expireHolds(reservationRepository.findHoldIdsForUserForUpdate(userId, clock.instant()));
+		expirationService.expireHolds(
+				reservationRepository.findHoldIdsForUserForUpdate(userId, clock.instant())
+		);
 		return reservationRepository.findAllByUser_IdAndStatusOrderByCreatedAtAscIdAsc(
 				userId,
 				ReservationStatus.HELD
@@ -193,7 +194,7 @@ public class ReservationService {
 	@Transactional
 	public List<ReservationEntity> getMyReservations(Long userId) {
 		Instant now = clock.instant();
-		expireNoShows(reservationRepository.findNoShowIdsForUserForUpdate(
+		expirationService.expireNoShows(reservationRepository.findNoShowIdsForUserForUpdate(
 				userId,
 				now,
 				entryPolicy.activeStartCutoff(now)
@@ -222,48 +223,6 @@ public class ReservationService {
 		reservation.cancel(now);
 		publish(ParkingChangeReason.RESERVATION_CANCELLED, reservation);
 		return reservation;
-	}
-
-	@Transactional
-	public int expireHolds() {
-		return expireHolds(reservationRepository.findDueHoldIdsForUpdate(
-				clock.instant(),
-				HOLD_EXPIRY_BATCH_SIZE
-		));
-	}
-
-	@Transactional
-	public int expireNoShows() {
-		Instant now = clock.instant();
-		return expireNoShows(reservationRepository.findDueNoShowIdsForUpdate(
-				now,
-				entryPolicy.activeStartCutoff(now),
-				NO_SHOW_BATCH_SIZE
-		));
-	}
-
-	private int expireHolds(List<Long> reservationIds) {
-		int expiredCount = 0;
-		for (ReservationEntity reservation : reservationRepository.findAllById(reservationIds)) {
-			if (reservation.getStatus() == ReservationStatus.HELD) {
-				reservation.expireHold();
-				publish(ParkingChangeReason.HOLD_EXPIRED, reservation);
-				expiredCount++;
-			}
-		}
-		return expiredCount;
-	}
-
-	private int expireNoShows(List<Long> reservationIds) {
-		int expiredCount = 0;
-		for (ReservationEntity reservation : reservationRepository.findAllById(reservationIds)) {
-			if (reservation.getStatus() == ReservationStatus.ACTIVE) {
-				reservation.expireNoShow();
-				publish(ParkingChangeReason.RESERVATION_EXPIRED, reservation);
-				expiredCount++;
-			}
-		}
-		return expiredCount;
 	}
 
 	private void publish(ParkingChangeReason reason, ReservationEntity reservation) {

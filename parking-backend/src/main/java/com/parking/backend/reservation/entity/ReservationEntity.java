@@ -103,42 +103,46 @@ public class ReservationEntity {
 	}
 
 	public void expireHold() {
+		requireStatus(ReservationStatus.HELD, "expire a hold");
 		status = ReservationStatus.HOLD_EXPIRED;
 	}
 
 	public void expireNoShow() {
-		if (status != ReservationStatus.ACTIVE) {
-			throw new IllegalStateException("Only an active reservation can expire as a no-show");
-		}
+		requireStatus(ReservationStatus.ACTIVE, "expire as a no-show");
 		status = ReservationStatus.EXPIRED;
 	}
 
 	public void confirm(Instant confirmedAt) {
+		requireStatus(ReservationStatus.HELD, "confirm a hold");
 		status = ReservationStatus.ACTIVE;
 		this.confirmedAt = Objects.requireNonNull(confirmedAt, "Confirmation time must not be null");
 	}
 
 	public void release(Instant releasedAt) {
+		requireStatus(ReservationStatus.HELD, "release a hold");
 		status = ReservationStatus.HOLD_RELEASED;
 		cancelledAt = Objects.requireNonNull(releasedAt, "Release time must not be null");
 	}
 
 	public void cancel(Instant cancelledAt) {
+		requireStatus(ReservationStatus.ACTIVE, "cancel a reservation");
 		status = ReservationStatus.CANCELLED;
 		this.cancelledAt = Objects.requireNonNull(cancelledAt, "Cancellation time must not be null");
 	}
 
 	public void checkIn() {
-		if (status != ReservationStatus.ACTIVE) {
-			throw new IllegalStateException("Only an active reservation can be checked in");
-		}
+		requireStatus(ReservationStatus.ACTIVE, "be checked in");
 		status = ReservationStatus.CHECKED_IN;
 	}
 
 	public void complete() {
-		if (status != ReservationStatus.CHECKED_IN) {
-			throw new IllegalStateException("Only a checked-in reservation can be completed");
-		}
+		requireStatus(ReservationStatus.CHECKED_IN, "be completed");
 		status = ReservationStatus.COMPLETED;
+	}
+
+	private void requireStatus(ReservationStatus expectedStatus, String action) {
+		if (status != expectedStatus) {
+			throw new IllegalStateException("Only a " + expectedStatus + " reservation can " + action);
+		}
 	}
 }
