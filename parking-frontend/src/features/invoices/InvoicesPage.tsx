@@ -17,7 +17,7 @@ export function InvoicesPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Счета" description="Исторические начисления сервера. Стоимость здесь не пересчитывается." />
+      <PageHeader title="Счета" />
       <div className={`grid min-w-0 gap-6 ${selectedId ? 'xl:grid-cols-[minmax(0,1fr)_460px]' : ''}`}>
         <Card className="min-w-0">
           {invoices.isPending ? <LoadingState /> : null}

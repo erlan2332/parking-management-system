@@ -6,7 +6,6 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../features/auth/auth-context'
 import { profileQuery } from '../../features/profile/api'
-import { useRealtimeStatus } from '../../features/realtime/realtime-context'
 import { Button } from '../../shared/ui/Button'
 
 const navigation = [
@@ -24,7 +23,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <>
       <div className="flex h-20 items-center gap-3 border-b border-slate-800 px-5">
         <span className="grid size-10 place-items-center rounded-xl bg-blue-600 text-white"><CarFront className="size-5" /></span>
-        <div><p className="font-bold text-white">Паркинг</p><p className="text-xs text-slate-400">Управление парковкой</p></div>
+        <p className="font-bold text-white">Паркинг</p>
       </div>
       <nav className="grid gap-1 p-3" aria-label="Основная навигация">
         {navigation.map(({ to, label, icon: Icon }) => (
@@ -45,7 +44,6 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { logout } = useAuth()
-  const realtimeStatus = useRealtimeStatus()
   const profile = useQuery(profileQuery())
 
   return (
@@ -64,11 +62,7 @@ export function AppLayout() {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
           <button className="grid size-11 place-items-center rounded-xl text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Открыть меню"><Menu /></button>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden items-center gap-2 text-xs text-slate-500 md:flex" title="Статус обновлений парковки">
-              <span className={`size-2 rounded-full ${realtimeStatus === 'connected' ? 'bg-emerald-500' : realtimeStatus === 'disconnected' ? 'bg-slate-400' : 'animate-pulse bg-amber-500'}`} />
-              {realtimeStatus === 'connected' ? 'В реальном времени' : 'REST-синхронизация'}
-            </span>
-            <div className="hidden text-right sm:block"><p className="max-w-56 truncate text-sm font-semibold text-slate-900">{profile.data?.email ?? 'Водитель'}</p><p className="text-xs text-slate-500">Личная сессия</p></div>
+            <p className="hidden max-w-56 truncate text-sm font-semibold text-slate-900 sm:block">{profile.data?.email ?? 'Водитель'}</p>
             <Button variant="ghost" onClick={logout} title="Выйти из аккаунта"><LogOut className="size-4" /><span className="hidden sm:inline">Выйти</span></Button>
           </div>
         </header>
