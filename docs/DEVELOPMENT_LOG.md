@@ -304,3 +304,38 @@
   broker, durable WebSocket history, exactly-once SMTP guarantee, payment
   processing, or frontend. Within the documented single-backend architecture,
   the server contracts are ready for the React client.
+
+## Stage 11-R — Backend Architecture Refactoring
+
+- Normalized every feature into responsibility-focused packages such as
+  `controller`, `dto`, `mapper`, `service`, `repository`, `entity`, `model`,
+  and `config`. Cross-cutting scheduling remains in `automation`; no empty
+  layers or one-implementation service interfaces were added.
+- Added Lombok only for mechanical boilerplate: constructor injection, JPA
+  getters and protected no-argument constructors, and simple configuration
+  accessors. Explicit constructors remain where JWT and pricing configuration
+  validation protects invariants.
+- Added dedicated response mappers for auth, users, vehicles, parking spots,
+  reservations, barrier operations, visits, and invoices. Response DTOs no
+  longer import JPA entities, and controllers no longer call DTO factories.
+- Simplified `AuthService` to return domain results and moved visit-cost
+  selection from the controller into `ParkingVisitService`.
+- Kept `BarrierService` as the transaction-owning facade while moving entry
+  and exit orchestration into focused collaborators. Entry still uses
+  `noRollbackFor` for persisted no-show transitions; exit and invoice creation
+  remain one transaction with the established spot-to-vehicle lock order.
+- Extracted hold and no-show expiration into
+  `ReservationExpirationService`. Scheduler and request-time cleanup now share
+  one implementation without introducing independent nested transactions.
+  Reservation status methods apply one consistent source-state guard.
+- Removed repository and service methods with no production callers. Active
+  spot occupancy now uses an ID projection instead of loading complete visit
+  entities, while PostgreSQL exclusion constraints, partial unique indexes,
+  pessimistic locks, and Flyway V1-V7 remain unchanged.
+- Replaced six duplicated mutable clock implementations with one test fixture
+  and added coverage for sub-second tariff-boundary allocation. The final
+  PostgreSQL-backed build passed 160/160 tests; the unchanged smoke selection
+  passed 22/22, including JWT, concurrency, invoices, reminders, and STOMP.
+- REST endpoints, JSON fields, status codes, JWT rules, WebSocket endpoint and
+  topic, event reasons, tariffs, rounding, reservation timing, and historical
+  invoice semantics were preserved.

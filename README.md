@@ -36,6 +36,33 @@ The frontend is not implemented yet.
 - React + TypeScript driver interface
 - Payment processing (invoices already exist; payments do not)
 
+## Backend Architecture
+
+Backend code is organized by business module (`auth`, `reservation`,
+`barrier`, `invoice`, and so on), then by responsibility inside each module:
+`controller`, `dto`, `mapper`, `service`, `repository`, `entity`, `model`,
+`config`, or another narrowly named technical role. A package is created only
+when that responsibility exists; empty architectural layers are avoided.
+
+- Controllers define HTTP boundaries, delegate use cases to services, and map
+  domain results to response DTOs.
+- DTOs define JSON contracts and validation only. They never depend on JPA
+  entities.
+- Mappers own entity/domain-to-response conversion without repositories,
+  transactions, or business decisions.
+- Services own use cases and transaction boundaries. Service interfaces are
+  introduced only when multiple implementations or a real substitution
+  boundary exists.
+- Entities protect persistent state and valid status transitions. Repositories
+  retain PostgreSQL-specific locking and projection queries.
+
+Lombok is used for safe mechanical boilerplate: constructor injection,
+entity getters, protected JPA no-argument constructors, and simple property
+accessors. Constructors that validate configuration or establish invariants
+remain explicit. The barrier facade deliberately owns the entry and exit
+transactions; its focused collaborators do not start independent transactions,
+so lock order and atomic invoice creation remain unchanged.
+
 ## Local Development
 
 ### Prerequisites
