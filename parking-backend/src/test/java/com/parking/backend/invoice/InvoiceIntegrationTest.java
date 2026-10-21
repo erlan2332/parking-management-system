@@ -1,5 +1,7 @@
 package com.parking.backend.invoice;
 
+import com.parking.backend.support.MutableClock;
+
 import com.parking.backend.invoice.entity.InvoiceEntity;
 import com.parking.backend.invoice.model.InvoiceStatus;
 import com.parking.backend.invoice.repository.InvoiceRepository;
@@ -47,7 +49,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -371,35 +372,4 @@ class InvoiceIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }

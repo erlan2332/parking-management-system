@@ -1,5 +1,7 @@
 package com.parking.backend.realtime;
 
+import com.parking.backend.support.MutableClock;
+
 import com.parking.backend.realtime.config.ParkingWebSocketConfig;
 import com.parking.backend.realtime.event.ParkingAvailabilityChangedEvent;
 import com.parking.backend.realtime.event.ParkingChangeReason;
@@ -15,6 +17,7 @@ import com.parking.backend.parking.service.ParkingSpotService;
 import com.parking.backend.parking.model.ParkingSpotStatus;
 import com.parking.backend.reservation.entity.ReservationEntity;
 import com.parking.backend.reservation.service.ReservationService;
+import com.parking.backend.reservation.service.ReservationExpirationService;
 import com.parking.backend.security.service.JwtService;
 import com.parking.backend.user.entity.UserEntity;
 import com.parking.backend.user.repository.UserRepository;
@@ -53,7 +56,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +64,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -91,6 +92,8 @@ class ParkingRealtimeIntegrationTest {
 	private int port;
 	@Autowired
 	private ReservationService reservationService;
+	@Autowired
+	private ReservationExpirationService reservationExpirationService;
 	@Autowired
 	private BarrierService barrierService;
 	@Autowired
@@ -230,9 +233,9 @@ class ParkingRealtimeIntegrationTest {
 		ReservationEntity expiringHold = createHold(driver, spot("A2"));
 		assertEvent(events, ParkingChangeReason.HOLD_CREATED, spot("A2"));
 		clock.set(expiringHold.getHoldExpiresAt());
-		assertEquals(1, reservationService.expireHolds());
+		assertEquals(1, reservationExpirationService.expireDueHolds());
 		assertEvent(events, ParkingChangeReason.HOLD_EXPIRED, spot("A2"));
-		assertEquals(0, reservationService.expireHolds());
+		assertEquals(0, reservationExpirationService.expireDueHolds());
 		assertNoEvent(events);
 	}
 
@@ -254,9 +257,9 @@ class ParkingRealtimeIntegrationTest {
 		assertEvent(events, ParkingChangeReason.HOLD_CREATED, spot("A2"));
 		assertEvent(events, ParkingChangeReason.RESERVATION_CONFIRMED, spot("A2"));
 		clock.set(noShow.getStartAt().plus(Duration.ofMinutes(15)));
-		assertEquals(1, reservationService.expireNoShows());
+		assertEquals(1, reservationExpirationService.expireDueNoShows());
 		assertEvent(events, ParkingChangeReason.RESERVATION_EXPIRED, spot("A2"));
-		assertEquals(0, reservationService.expireNoShows());
+		assertEquals(0, reservationExpirationService.expireDueNoShows());
 		assertNoEvent(events);
 	}
 
@@ -539,35 +542,4 @@ class ParkingRealtimeIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }

@@ -1,5 +1,7 @@
 package com.parking.backend.barrier;
 
+import com.parking.backend.support.MutableClock;
+
 import com.parking.backend.barrier.service.BarrierService;
 
 import com.parking.backend.common.exception.NoActiveVisitException;
@@ -45,7 +47,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -53,7 +54,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -475,35 +475,4 @@ class BarrierIntegrationTest {
 		}
 	}
 
-	static final class MutableClock extends Clock {
-
-		private final AtomicReference<Instant> instant;
-
-		MutableClock(Instant instant) {
-			this.instant = new AtomicReference<>(instant);
-		}
-
-		void set(Instant value) {
-			instant.set(value);
-		}
-
-		void advance(Duration duration) {
-			instant.updateAndGet(current -> current.plus(duration));
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return ZoneOffset.UTC.equals(zone) ? this : Clock.fixed(instant(), zone);
-		}
-
-		@Override
-		public Instant instant() {
-			return instant.get();
-		}
-	}
 }
