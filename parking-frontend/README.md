@@ -1,32 +1,90 @@
-# React + TypeScript + Vite
+# Parking Management Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React-клиент водительской части Parking Management System. Приложение работает
+только с реальным Spring Boot API: mock-сервера и локальных копий серверных
+данных нет.
 
-Currently, two official plugins are available:
+## Стек
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19, TypeScript 6 в strict-режиме и Vite 8;
+- React Router для публичных и защищённых маршрутов;
+- TanStack Query для серверного состояния и точечной инвалидации кэша;
+- STOMP.js для JWT-аутентифицированных WebSocket-обновлений;
+- Tailwind CSS 4 и Lucide для адаптивного интерфейса;
+- Luxon для отображения времени парковки в `Asia/Bishkek`;
+- Vitest и React Testing Library для компактных функциональных тестов.
 
-## React Compiler
+## Конфигурация
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Требуется Node.js 22 LTS. Скопируйте пример переменных:
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cp .env.example .env.local
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+```dotenv
+VITE_API_BASE_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080/ws/parking
+```
+
+В этих переменных нет секретов. JWT хранится только в `sessionStorage` текущей
+вкладки и передаётся как Bearer token в REST и STOMP `CONNECT`.
+
+## Запуск
+
+Сначала запустите Backend и PostgreSQL по инструкции корневого README, затем:
+
+```bash
+cd parking-frontend
+npm ci
+npm run dev
+```
+
+Vite доступен по `http://localhost:5173`. Порт фиксирован через `strictPort`,
+поэтому занятый 5173 завершит запуск с понятной ошибкой вместо незаметного
+перехода на другой адрес.
+
+## Пользовательский сценарий
+
+1. Зарегистрируйтесь и войдите.
+2. Добавьте автомобиль в разделе «Мои автомобили».
+3. Выберите автомобиль, дату и интервал на карте парковки.
+4. Нажмите свободное место: Backend создаст трёхминутный Temporary Hold.
+5. Подтвердите hold и проверьте запись в «Мои бронирования».
+6. Для фактической поездки используйте «Шлагбаум»; после выезда Backend создаст
+   визит и неизменяемый счёт.
+7. Детали поездки и исторические тарифы находятся в «История парковки» и
+   «Счета».
+
+Для проверки real-time откройте приложение в двух независимых браузерных
+сессиях под разными пользователями. Создание, подтверждение, освобождение или
+истечение hold в первой сессии должно обновить выбранный интервал второй без
+ручной перезагрузки. WebSocket передаёт только сигнал инвалидации; фактическое
+состояние всегда повторно загружается через REST.
+
+## Проверки
+
+```bash
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
+```
+
+Production preview при необходимости запускается командой `npm run preview`.
+
+## Структура
+
+- `src/app` — маршруты, Query Client и общий layout;
+- `src/features` — auth, profile, vehicles, parking, reservations, realtime,
+  barrier, visits и invoices;
+- `src/shared/api` — типизированный HTTP-клиент и DTO;
+- `src/shared/lib` — форматирование времени, денег и статусов;
+- `src/shared/ui` — небольшой набор переиспользуемых UI-компонентов.
+
+## Ограничения
+
+Нет refresh token, оплаты, PDF-счетов, административной панели и push-
+уведомлений. После истечения часового JWT пользователь входит снова. STOMP
+broker однопроцессный и недолговечный; после reconnect клиент выполняет REST-
+синхронизацию.

@@ -339,3 +339,30 @@
 - REST endpoints, JSON fields, status codes, JWT rules, WebSocket endpoint and
   topic, event reasons, tariffs, rounding, reservation timing, and historical
   invoice semantics were preserved.
+
+## Stages 12-15 — Complete React Frontend and Full-Stack Integration
+
+- Created a strict React, TypeScript, Vite, and Tailwind application around the
+  existing Backend contracts. Feature modules own auth, profile, vehicles,
+  parking, reservations, realtime, barrier, visits, and invoices; shared code
+  is limited to the typed API client, formatting, layout, and reusable UI.
+- Added session-scoped JWT authentication, protected routes, unified Russian
+  API errors, responsive navigation, loading/empty/error states, and targeted
+  TanStack Query keys instead of duplicating server state in React Context.
+- Implemented interval-aware 20-spot parking, server-backed three-minute holds,
+  countdown from `holdExpiresAt`, confirmation/release, reservation history,
+  and cancellation confirmation. The selected interval is part of the
+  availability query key and conflicts trigger a fresh REST read.
+- Connected STOMP with JWT in `CONNECT`, automatic reconnect, teardown on
+  logout, and REST invalidation after every parking event. A real two-session
+  browser check observed both hold creation and release without reloading.
+- Added the barrier simulator, active/completed visit history, automatic invoice
+  discovery, and saved day/night tariff details. Vehicle status compares the
+  Backend's normalized plate identity, avoiding stale entry controls when the
+  display plate contains spaces or separators.
+- Verified the layout at desktop and 390-pixel mobile widths. Fixed the invoice
+  detail's intrinsic grid sizing so the document has no horizontal overflow,
+  while keeping readable tariff columns and touch-sized controls.
+- Added focused Vitest/Testing Library coverage plus a separate Frontend CI
+  workflow. Updated both READMEs with real full-stack startup, user journeys,
+  WebSocket verification, tests, ports, and explicit product limitations.
