@@ -3,6 +3,7 @@ package com.parking.backend.security;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,6 +30,16 @@ class SecurityConfigTest {
 	@Test
 	void rejectsJwtSecretShorterThan256Bits() {
 		assertThrows(IllegalStateException.class, () -> securityConfig.jwtSecretKey(properties("c2hvcnQ=")));
+	}
+
+	@Test
+	void rejectsWildcardRestApiOrigin() {
+		IllegalStateException exception = assertThrows(
+				IllegalStateException.class,
+				() -> new RestCorsProperties(List.of("*"))
+		);
+
+		assertEquals("Wildcard REST API origins are not allowed", exception.getMessage());
 	}
 
 	private static JwtProperties properties(String secret) {
