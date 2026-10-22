@@ -1,0 +1,74 @@
+services:
+  - type: web
+    name: parking-management-backend-erlan2332
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: parking-backend
+    branch: dev-parking
+    autoDeployTrigger: checksPass
+    healthCheckPath: /actuator/health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: parking-management-db-erlan2332
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: parking-management-db-erlan2332
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: parking-management-db-erlan2332
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: parking-management-db-erlan2332
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: parking-management-db-erlan2332
+          property: password
+      - key: JWT_SECRET_BASE64
+        generateValue: true
+      - key: PARKING_REST_ALLOWED_ORIGINS
+        value: https://parking-management-frontend-erlan2332.onrender.com
+      - key: PARKING_WEBSOCKET_ALLOWED_ORIGINS
+        value: https://parking-management-frontend-erlan2332.onrender.com
+      - key: PARKING_PRICING_ZONE_ID
+        value: Asia/Bishkek
+      - key: RESERVATION_AUTOMATION_DELAY
+        value: PT30S
+      - key: MAIL_ENABLED
+        value: "false"
+
+  - type: web
+    name: parking-management-frontend-erlan2332
+    runtime: static
+    rootDir: parking-frontend
+    branch: dev-parking
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: VITE_API_BASE_URL
+        value: https://parking-management-backend-erlan2332.onrender.com
+      - key: VITE_WS_URL
+        value: wss://parking-management-backend-erlan2332.onrender.com/ws/parking
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: parking-management-db-erlan2332
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "17"
+    databaseName: parking_management
+    user: parking_management
+    ipAllowList: []

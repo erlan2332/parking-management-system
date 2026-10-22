@@ -119,6 +119,28 @@ npm run build
 
 GitHub Actions отдельно проверяет Backend на PostgreSQL и Frontend. Smoke-тесты покрывают ключевые сценарии, но не заменяют полный регрессионный и браузерный прогон.
 
+## Развёртывание на Render
+
+Файл `render.yaml` описывает единый production-стенд:
+
+- Frontend — Render Static Site;
+- Backend — Render Web Service, собранный из `parking-backend/Dockerfile`;
+- PostgreSQL 17 — Render Postgres с доступом только по приватной сети.
+
+Публичные адреса стенда:
+
+| Сервис | Адрес |
+|---|---|
+| Frontend | https://parking-management-frontend-erlan2332.onrender.com |
+| Backend | https://parking-management-backend-erlan2332.onrender.com |
+| Health check | https://parking-management-backend-erlan2332.onrender.com/actuator/health |
+
+Оба сервиса используют ветку `dev-parking` и `autoDeployTrigger: checksPass`. После push GitHub Actions выполняет Backend smoke-тесты, сборку production Docker-образа, Frontend lint/typecheck/tests/build. Render начинает новый деплой только когда все проверки коммита завершились успешно.
+
+Для первого запуска импортируйте репозиторий в Render как Blueprint. JWT-секрет и реквизиты базы генерируются и передаются сервису самим Render; секреты не хранятся в Git.
+
+Blueprint использует бесплатные планы, поэтому Backend может засыпать при отсутствии трафика, а бесплатная PostgreSQL истекает через 30 дней. Для постоянного production-стенда переключите Backend и PostgreSQL на платные планы в Render.
+
 ## Архитектура и безопасность
 
 Backend организован по модулям (`auth`, `reservation`, `barrier`, `invoice` и др.). Контроллеры обрабатывают HTTP, сервисы — бизнес-операции и транзакции, репозитории — БД, мапперы — преобразование в DTO. Lombok устраняет шаблонный код там, где это безопасно для JPA.
