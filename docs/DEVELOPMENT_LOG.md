@@ -1,368 +1,148 @@
-# Development Log
+# Журнал разработки
 
-## Stage 01 — PostgreSQL and Flyway
+Этот документ описывает последовательные этапы разработки **Parking Management System**, принятые технические подходы, реализованные возможности и проведённые проверки.
 
-- Configured the backend to read PostgreSQL connection settings from
-  `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
-- Chose `spring.jpa.hibernate.ddl-auto=validate`: Flyway owns schema changes,
-  while Hibernate detects mapping/schema mismatches without mutating data.
-- Added a PostgreSQL migration for `parking_spots` with a generated primary
-  key, a unique non-blank code, and a non-null active flag.
-- Added a separate seed migration for spots `A1`-`A10` and `B1`-`B10`.
-  Flyway records applied migrations, and the unique code constraint plus
-  `ON CONFLICT DO NOTHING` prevents duplicate seed rows.
-- Kept occupancy out of `parking_spots`; later stages will derive it from
-  reservations and active visits.
-- Did not add domain classes or extra layers at this stage because there is no
-  business behavior to model yet. This keeps the foundation focused and avoids
-  premature abstractions while preserving the existing package structure.
+> **О временных метках:** в исходном журнале не были указаны точные даты и время каждого этапа. Здесь они не добавлены, чтобы не выдавать предполагаемые значения за реальные. Временную хронологию можно восстановить отдельно по Git-коммитам и журналам Codex.
 
-## Stage 02 — Users and Vehicles
+## Этап №01 — PostgreSQL и Flyway
 
-- Added `users` and `vehicles` through a new V3 migration; the already applied
-  V1 and V2 migrations remain unchanged.
-- Enforced case-insensitive email uniqueness with a PostgreSQL expression
-  index on `LOWER(email)` and global vehicle identity with a unique normalized
-  plate constraint.
-- Modelled only the required unidirectional `VehicleEntity` to `UserEntity`
-  association. It is lazy and has no remove cascade, avoiding unnecessary
-  collection loading and accidental historical-data deletion.
-- Kept plate normalization in a stateless component so creation and future
-  lookup use identical rules without coupling those rules to persistence.
-- Added a transactional vehicle service. A pre-check provides a clear normal
-  duplicate response, while the database constraint remains authoritative for
-  concurrent inserts.
-- Added unit tests for normalization and service rules plus PostgreSQL-backed
-  integration tests using a separate `TEST_DB_*` connection.
+- Настроено чтение параметров подключения к PostgreSQL из переменных окружения `DB_URL`, `DB_USERNAME` и `DB_PASSWORD`.
+- Выбрана настройка `spring.jpa.hibernate.ddl-auto=validate`: изменениями схемы управляет Flyway, а Hibernate проверяет соответствие сущностей таблицам, не изменяя структуру данных.
+- Добавлена миграция PostgreSQL для таблицы `parking_spots`: автоматически формируемый первичный ключ, уникальный непустой код места и обязательный признак активности.
+- Создана отдельная миграция с начальными данными: места `A1`–`A10` и `B1`–`B10`. Flyway учитывает применённые миграции; уникальность кода и `ON CONFLICT DO NOTHING` предотвращают повторное добавление мест.
+- Занятость не записывается непосредственно в `parking_spots`: на следующих этапах она определяется по броням и активным визитам.
+- На этом этапе не добавлялись доменные классы и лишние слои, потому что бизнес-логики для них ещё не было. Это позволило создать простой фундамент без преждевременных абстракций и сохранить принятую структуру пакетов.
 
-## Stage 03 — JWT Authentication and Driver API
+## Этап №02 — Пользователи и автомобили
 
-- Added Spring Security with the OAuth2 Resource Server JWT support instead of
-  a custom authentication filter or custom cryptography.
-- Configured stateless request processing. Only registration and login POST
-  endpoints are public; every other route and HTTP method requires a valid
-  Bearer token.
-- Added BCrypt password hashing with a ten-character minimum and an explicit
-  72-byte UTF-8 limit matching BCrypt's input constraint.
-- Added HS256 access tokens containing user ID subject, issuer, issued time,
-  and expiration. Runtime startup fails when `JWT_SECRET_BASE64` is missing,
-  malformed, or shorter than 256 bits.
-- Added profile and vehicle REST DTOs so persistence entities and password
-  hashes never form part of HTTP responses. Vehicle ownership always comes
-  from the validated JWT subject, never from request data.
-- Reused `VehicleService` and `PlateNormalizer`; the only service extension is
-  an owner-scoped vehicle lookup that returns the same 404 for missing and
-  foreign vehicles.
-- Added uniform validation, authentication, authorization, not-found, and
-  conflict responses without exposing SQL or framework details.
-- Added unit tests plus PostgreSQL/MockMvc integration tests with active
-  security filters, including concurrent registration and invalid JWT cases.
+- Через миграцию V3 добавлены таблицы `users` и `vehicles`. Уже применённые миграции V1 и V2 оставлены без изменений.
+- В PostgreSQL обеспечена уникальность email без учёта регистра через индекс по `LOWER(email)`. Для автомобильных номеров введено глобальное ограничение уникальности нормализованного значения.
+- Создана только необходимая однонаправленная связь `VehicleEntity` → `UserEntity`. Она загружается лениво и не предусматривает каскадного удаления, чтобы не подгружать лишние коллекции и случайно не удалять исторические данные.
+- Нормализация номера вынесена в компонент без состояния. При добавлении автомобиля и при последующем поиске используются одинаковые правила, не привязанные к механизму хранения данных.
+- Добавлен транзакционный сервис автомобилей. Предварительная проверка даёт понятное сообщение о дубликате в обычном случае, а ограничение базы данных остаётся окончательной защитой при одновременных запросах.
+- Добавлены модульные тесты нормализации и бизнес-правил, а также интеграционные тесты с PostgreSQL через отдельные переменные `TEST_DB_*`.
 
-## Stage 04 — Parking Spots and Availability
+## Этап №03 — JWT-аутентификация и API водителя
 
-- Mapped the existing `parking_spots` table without changing Flyway V1-V3 and
-  added a repository query that returns the seeded codes in natural order:
-  `A1`-`A10`, then `B1`-`B10`.
-- Kept operational activity separate from occupancy. Active spots currently
-  resolve to `FREE`, inactive spots to `UNAVAILABLE`; `RESERVED` and
-  `OCCUPIED` remain computed future states backed by real reservations and
-  visits rather than new database columns or placeholder data.
-- Added secured DTO-based endpoints for listing spots, reading one spot, and
-  checking all spots for a requested interval. No persistence entity is
-  exposed by the HTTP layer.
-- Modelled request boundaries with `OffsetDateTime` and compare their instants,
-  so offsets are handled correctly. Intervals are validated as non-empty
-  half-open ranges `[startAt, endAt)`.
-- Availability currently reflects the only relevant persisted fact:
-  `active`. The service owns this rule so reservation overlap and active-visit
-  checks can be added there in later stages without changing the API shape.
-- Added unit, PostgreSQL-backed persistence/Flyway, and secured MockMvc tests,
-  while retaining the existing uniform API error format.
+- Добавлены Spring Security и поддержка JWT через OAuth2 Resource Server вместо собственного фильтра аутентификации и самописной криптографии.
+- Настроена обработка запросов без серверной сессии (*stateless*). Публичными остались только POST-запросы регистрации и входа; для остальных маршрутов и HTTP-методов требуется действительный Bearer-токен.
+- Пароли хранятся с использованием BCrypt. Установлены минимальная длина 10 символов и максимальный размер входного пароля 72 байта в UTF-8 с учётом ограничений BCrypt.
+- Токены доступа создаются по HS256 и содержат идентификатор пользователя (`sub`), издателя (`iss`), время выпуска (`iat`) и срок действия (`exp`). Если `JWT_SECRET_BASE64` отсутствует, некорректен или задаёт ключ короче 256 бит, приложение не запускается.
+- Для профиля и автомобилей используются REST DTO: JPA-сущности и хеши паролей не попадают в HTTP-ответы. Владелец автомобиля определяется только по проверенному `sub` JWT, а не по данным запроса.
+- Повторно использованы `VehicleService` и `PlateNormalizer`. В сервис добавлен поиск автомобиля в пределах текущего владельца; отсутствующий и чужой автомобиль одинаково дают 404.
+- Унифицированы ответы при ошибках валидации, аутентификации, авторизации, отсутствующих данных и конфликтах — без раскрытия SQL и внутренних подробностей Spring.
+- Добавлены модульные тесты и интеграционные PostgreSQL/MockMvc-тесты с включёнными фильтрами безопасности, в том числе проверки конкурентной регистрации и недействительных JWT.
 
-## CI-01 — Backend Smoke Tests
+## Этап №04 — Парковочные места и доступность
 
-- Added one GitHub Actions job for pull requests to `dev-parking` and pushes
-  after merge. It uses Temurin Java 21, the project Gradle Wrapper, and Gradle
-  dependency caching without adding a build matrix or deployment steps.
-- Chose an ephemeral PostgreSQL 17 service container with a health check so CI
-  exercises the same Flyway migrations, Hibernate validation, constraints, and
-  SQL behavior as local integration tests instead of substituting H2.
-- Added a dedicated `smokeTest` Gradle task that selects 12 existing critical
-  scenarios with the JUnit `smoke` tag and fails when no tests are discovered.
-  The standard `test` and `build` tasks still run the complete suite.
-- Kept CI intentionally lightweight: it assembles the Spring Boot JAR, checks
-  authentication, authorization, vehicles, parking spots, and availability,
-  and uploads only test reports when a failure occurs.
+- Существующая таблица `parking_spots` отображена на JPA-сущность без изменения миграций V1–V3. Репозиторий возвращает места в естественном порядке: `A1`–`A10`, затем `B1`–`B10`.
+- Активность места отделена от его занятости. На данном этапе активные места обозначаются `FREE`, отключённые — `UNAVAILABLE`. Состояния `RESERVED` и `OCCUPIED` должны в дальнейшем вычисляться по реальным броням и визитам, а не храниться в дополнительных столбцах или заглушках.
+- Добавлены защищённые API с DTO для получения списка мест, отдельного места и доступности всех мест на заданный интервал. Сущности хранения данных через HTTP не раскрываются.
+- Границы интервалов представлены через `OffsetDateTime` и сравниваются как моменты времени с корректным учётом смещения UTC. Используются непустые полуоткрытые интервалы `[startAt, endAt)`.
+- На момент этого этапа доступность определяется единственным соответствующим сохранённым фактом — признаком `active`. Правило размещено в сервисе, чтобы впоследствии добавить проверку пересекающихся броней и активных визитов без изменения контракта API.
+- Добавлены модульные, PostgreSQL/Flyway-интеграционные и защищённые MockMvc-тесты. Единый формат ошибок API сохранён.
 
-## Stage 05 — Timed Holds and Reservations
+## CI-01 — Автоматические проверки Backend
 
-- Chose one `reservations` table for temporary holds and confirmed bookings so
-  confirmation changes one row from `HELD` to `ACTIVE` without a release gap or
-  a second insert. Historical terminal states stay in the same table.
-- Added PostgreSQL `btree_gist` exclusion constraints over half-open
-  `tstzrange(start_at, end_at, '[)')` values. Separate constraints make the
-  database authoritative against overlapping active intervals for both a spot
-  and a vehicle, including requests that race between Java pre-checks.
-- Standardized hold creation lock order as parking spot followed by vehicle.
-  Before conflict checks, the transaction marks matching overdue holds as
-  `HOLD_EXPIRED`; therefore a newly available interval can be acquired even if
-  scheduled cleanup has not run yet.
-- Kept time server-owned through an injected `Clock`. A deadline is the earlier
-  of three minutes after creation and the requested start, is persisted in
-  PostgreSQL, and cannot be supplied or extended by the client. Confirmation at
-  the deadline or after the interval begins is rejected.
-- Added a 20-second scheduled bulk cleanup that changes only overdue `HELD`
-  rows. Repeated cleanup is safe and cannot expire `ACTIVE` reservations.
-- Extended availability with `HELD` and `RESERVED` while retaining interval
-  semantics. Blockers are loaded in one query for all spots, and future holds
-  do not alter the current-instant spot list.
-- Added owner-scoped secured hold, confirmation, release, history, and
-  cancellation endpoints. Repeated confirmation, release, and cancellation of
-  the already reached successful state are idempotent.
-- Added focused unit, PostgreSQL integration, secured MockMvc, controlled-clock,
-  and real concurrent-transaction tests. WebSocket broadcasting remains a
-  later-stage concern; clients currently refresh state through REST.
+- Настроен один workflow GitHub Actions для pull request в `dev-parking` и push после слияния. Он использует Temurin Java 21, Gradle Wrapper проекта и кеширование зависимостей Gradle — без матрицы сборок и этапов развёртывания.
+- Выбран временный сервис-контейнер PostgreSQL 17 с проверкой готовности. CI проверяет настоящие миграции Flyway, валидацию Hibernate, ограничения и SQL-поведение, как и локальные интеграционные тесты, вместо подмены PostgreSQL базой H2.
+- Добавлена отдельная задача Gradle `smokeTest`: первоначально она отбирала 12 критических сценариев с тегом JUnit `smoke` и завершалась ошибкой, если тесты не обнаружены. Стандартные задачи `test` и `build` по-прежнему выполняют полный набор тестов.
+- CI оставлен небольшим: сборка Spring Boot JAR и проверки аутентификации, авторизации, автомобилей, парковочных мест и доступности. Отчёты тестов загружаются при ошибках.
 
-## Stage 06 — Barrier Simulator and Parking Visits
+## Этап №05 — Временное удержание и бронирование
 
-- Added `parking_visits` as the source of truth for physical occupancy. Partial
-  PostgreSQL unique indexes enforce one active visit per vehicle and spot, and
-  a unique reservation reference prevents booking reuse even if an application
-  pre-check races.
-- Kept mutation lock order consistent with reservations: parking spot, vehicle,
-  then the related reservation or visit. Walk-in allocation reads candidates
-  in natural order, locks each candidate row, and rechecks visits and booking
-  obligations after lock acquisition.
-- Applied a conservative open-ended walk-in policy. A spot with any effective
-  hold, active reservation, or checked-in reservation is not assigned because
-  the walk-in exit time is unknown. The same rule rejects walk-in entry for a
-  vehicle with a future obligation.
-- Reservation entry is allowed only in the half-open window beginning at
-  `startAt` and ending at the earlier of `endAt` and `startAt + 15 minutes`.
-  Entry atomically changes `ACTIVE` to `CHECKED_IN` and links the new visit.
-- Exit records precise server time without rounding. It completes the visit and
-  changes a linked reservation from `CHECKED_IN` to `COMPLETED`; pricing and
-  invoice generation remain separate future work.
-- Extended parking state calculation with active visits. Physical occupancy has
-  priority over reservation display and conservatively blocks every future
-  interval until an actual exit is recorded. Queries load all active visits in
-  one pass rather than per parking spot.
-- Added controlled-clock, database-constraint, ownership, secured HTTP, and
-  independently transacted concurrency tests, including walk-in versus hold
-  creation on the same spot.
+- Для временных удержаний и подтверждённых броней выбрана одна таблица `reservations`. Подтверждение переводит ту же строку из `HELD` в `ACTIVE` без промежутка между освобождением и повторным созданием записи. Завершённые состояния остаются в этой таблице как история.
+- Добавлены ограничения исключения PostgreSQL на основе `btree_gist` и полуоткрытых диапазонов `tstzrange(start_at, end_at, '[)')`. Отдельные ограничения запрещают пересечение активных интервалов как для одного парковочного места, так и для одного автомобиля, даже если одновременные запросы прошли предварительные проверки Java.
+- Порядок блокировок при создании удержания стандартизирован: сначала парковочное место, затем автомобиль. Перед поиском конфликтов транзакция переводит просроченные удержания в `HOLD_EXPIRED`, поэтому освободившийся интервал можно занять, даже если плановая очистка ещё не выполнилась.
+- Время контролируется сервером через внедряемый `Clock`. Время окончания удержания — более ранний из двух моментов: через три минуты после создания или начало запрашиваемого интервала. Оно сохраняется в PostgreSQL, клиент не может его задать или продлить. Подтверждение на границе истечения или после начала интервала отклоняется.
+- Добавлена плановая пакетная очистка каждые 20 секунд, изменяющая только просроченные записи `HELD`. Повторные запуски безопасны и не затрагивают `ACTIVE`.
+- Проверка доступности расширена состояниями `HELD` и `RESERVED`, с сохранением логики интервалов. Блокирующие записи загружаются одним запросом для всех мест. Будущие удержания не меняют список состояний мест на текущий момент.
+- Добавлены защищённые API с проверкой владельца для удержания, подтверждения, освобождения, истории и отмены. Повторное выполнение уже завершённой успешной операции подтверждения, освобождения или отмены обрабатывается идемпотентно.
+- Добавлены модульные, PostgreSQL-интеграционные, защищённые MockMvc-тесты, тесты с управляемыми часами и настоящими конкурирующими транзакциями. Рассылка событий WebSocket оставлена на следующий этап; пока клиент обновляет данные через REST.
 
-## Stage 07 — Day and Night Parking Pricing
+## Этап №06 — Симулятор шлагбаума и парковочные визиты
 
-- Added an immutable, validated pricing configuration with an explicit parking
-  zone, day boundaries, and non-negative `BigDecimal` rates. Environment
-  variables can override every value without coupling pricing to database or
-  security configuration.
-- Kept the calculator independent of HTTP and persistence. It accepts actual
-  entry and exit `Instant` values and returns a reusable cost breakdown with
-  day/night seconds, rates, component costs, total cost, and `KGS` currency.
-- Split each visit at local tariff boundaries in `Asia/Bishkek` using
-  half-open intervals. The algorithm handles both tariff transitions,
-  midnight, multiple calendar days, and input timestamps with different UTC
-  offsets without consulting the host system time zone.
-- Calculate costs from whole seconds with `BigDecimal`. Component numerators
-  are accumulated before division, and the combined total is rounded once to
-  two decimal places using `HALF_UP`, avoiding per-segment minute rounding.
-- Added an owner-scoped secured cost endpoint for completed visits. Foreign
-  visits use the same 404 as missing visits, while an active visit returns a
-  conflict because no final exit time exists.
-- Deliberately left the quote transient. Until invoices snapshot rates and the
-  amount in a later stage, recalculating historical visits uses the current
-  application configuration.
+- Добавлена таблица `parking_visits` как источник истины о физической занятости мест. Частичные уникальные индексы PostgreSQL разрешают только один активный визит на автомобиль и на место. Уникальная ссылка на бронь исключает её повторное использование даже при гонках запросов.
+- Сохранён единый порядок блокировок: парковочное место, автомобиль, затем связанная бронь или визит. Для въезда без брони система перебирает кандидатов по порядку, блокирует подходящую строку и повторно проверяет визиты и обязательства по броням уже после получения блокировки.
+- Для въезда без брони выбрано консервативное правило с неизвестным временем выезда. Место не назначается, если для него есть действующее удержание, активная бронь или бронь с уже выполненным въездом. Такое же правило запрещает въезд без брони автомобилю, у которого есть будущее обязательство по бронированию.
+- Въезд по брони разрешён только в полуоткрытом интервале от `startAt` до более раннего из `endAt` и `startAt + 15 минут`. При въезде бронь атомарно переводится из `ACTIVE` в `CHECKED_IN` и связывается с новым визитом.
+- При выезде записывается точное серверное время без округления. Визит завершается, а связанная бронь переходит из `CHECKED_IN` в `COMPLETED`. Расчёт стоимости и создание счёта на данном этапе ещё не реализованы.
+- Расчёт состояния парковки дополнен активными визитами. Реальная занятость имеет приоритет перед отображением брони и блокирует будущие интервалы до фактического выезда. Все активные визиты загружаются одним запросом, а не отдельно для каждого места.
+- Добавлены тесты с управляемыми часами, ограничениями базы данных, проверкой владельца, защищёнными HTTP-запросами и независимыми конкурентными транзакциями — в том числе гонка между въездом без брони и удержанием одного места.
 
-## Stage 08 — Parking Invoices and Billing History
+## Этап №07 — Дневная и ночная тарификация
 
-- Added `invoices` through V6 without changing earlier migrations. A unique
-  visit reference and PostgreSQL checks enforce one `ISSUED` KGS invoice per
-  visit, consistent non-negative durations, rates and amounts, and valid
-  timestamp ordering. The restrictive foreign key protects billing history.
-- Kept pricing in `ParkingPricingService`. It now exposes the configured zone
-  and high-precision day/night components while still deriving the authoritative
-  two-decimal total from the combined numerator with one `HALF_UP` rounding.
-- Made exit completion and invoice insertion one transaction. Invoice
-  persistence failure rolls back the exit; a projection-based lock target
-  prevents stale managed visit state during concurrent exits, and the database
-  unique constraint remains the final protection against duplicate billing.
-- Snapshotted the actual interval, plate, spot, zone, durations, rates, cost
-  components, total, and currency. Issued amounts are consequently independent
-  of later configuration changes, and invoice numbers are stable derivatives
-  of database IDs rather than a separate sequence.
-- Added secured, owner-scoped DTO APIs for invoice history, invoice details,
-  and invoice lookup by visit. Missing and foreign invoices are indistinguishable
-  to callers, list loading fetches the required visit in one query, and GET
-  requests never create financial data.
-- Made the existing visit-cost endpoint prefer the persisted invoice snapshot.
-  Pre-V6 completed visits without snapshots may still be quoted using current
-  rates, but are not backfilled or represented as historically issued invoices.
-- Added focused PostgreSQL and MockMvc tests for snapshots, ownership, stable
-  ordering, legacy visits, constraints, rollback, idempotent issue handling,
-  and two independently transacted concurrent exits without timing sleeps.
+- Создана неизменяемая конфигурация тарифов с валидацией часового пояса парковки, границ дневного периода и неотрицательных ставок `BigDecimal`. Все параметры можно переопределить переменными окружения без привязки расчёта к БД или безопасности.
+- Калькулятор отделён от HTTP и хранения данных. Он принимает фактические `Instant` въезда и выезда и возвращает детализацию: дневные и ночные секунды, ставки, суммы по периодам, итог и валюту `KGS`.
+- Визит разделяется по локальным тарифным границам `Asia/Bishkek` с полуоткрытыми интервалами. Алгоритм обрабатывает обе смены тарифа, полночь, несколько календарных дней и исходные даты с разными смещениями UTC, не опираясь на часовой пояс компьютера, где работает сервер.
+- Стоимость вычисляется из целых секунд с помощью `BigDecimal`. Сначала суммируются числители составляющих, затем производится деление; общая стоимость округляется один раз до двух знаков по `HALF_UP`, без отдельного округления минут для каждого отрезка.
+- Добавлен защищённый API стоимости завершённого визита с проверкой владельца. Чужой визит, как и несуществующий, даёт 404; активный визит — конфликт, поскольку окончательное время выезда неизвестно.
+- На данном этапе результат расчёта намеренно не сохраняется. До введения счетов с зафиксированными ставками и суммами повторный расчёт старого визита использовал бы текущую конфигурацию тарифов.
 
-## Stage 09 — Reservation Automation and Email Reminders
+## Этап №08 — Счета и история начислений
 
-- Centralized the confirmed-booking entry deadline as
-  `min(endAt, startAt + 15 minutes)`. The same policy is used by barrier entry,
-  availability, hold creation, history refresh, and scheduled expiration, so
-  the exact boundary has one consistent half-open interpretation.
-- Added bounded PostgreSQL no-show cleanup with `FOR UPDATE SKIP LOCKED` and
-  status-guarded updates. Entry preserves the established spot, vehicle, then
-  reservation lock order and rereads locked state before creating a visit.
-- Kept logical expiration independent from scheduler timing. An overdue
-  `ACTIVE` booking stops blocking availability immediately, while hold creation
-  persists its `EXPIRED` state before relying on the existing exclusion
-  constraints. No-show expiration creates no visit, invoice, or charge.
-- Replaced the separate hold scheduler with one small configurable automation
-  coordinator. Temporary-hold rules are unchanged; the coordinator invokes
-  hold cleanup, no-show cleanup, and reminder processing every 30 seconds by
-  default.
-- Added a V7 PostgreSQL notification outbox with one
-  `RESERVATION_ENDING_SOON` row per reservation, constrained processing states,
-  attempt/error metadata, and indexes for safe claim and retry work.
-- Split reminder eligibility, transactional outbox state, message formatting,
-  and SMTP transport into focused components. SMTP calls happen outside the
-  database transaction and eligibility is rechecked immediately before send.
-- Made mail opt-in with validated environment configuration and finite network
-  timeouts. Tests and CI use an in-memory fake sender; no external mail service
-  or credential is required.
-- Documented the unavoidable SMTP acknowledgement gap: database uniqueness and
-  row claiming prevent normal concurrent duplicates, but a process failure
-  after SMTP acceptance and before the `SENT` commit can still cause a retry.
+- Через миграцию V6 добавлена таблица `invoices` без изменения предыдущих миграций. Уникальная ссылка на визит и ограничения PostgreSQL обеспечивают один счёт со статусом `ISSUED` в KGS на визит, неотрицательные длительности, ставки и суммы, корректный порядок временных меток. Ограничительный внешний ключ защищает финансовую историю.
+- Расчёт оставлен в `ParkingPricingService`. Теперь сервис предоставляет настроенный часовой пояс и дневную/ночную составляющие высокой точности, а окончательные два знака суммы по-прежнему вычисляет единым округлением `HALF_UP`.
+- Завершение выезда и создание счёта объединены в одну транзакцию. Ошибка сохранения счёта откатывает выезд. Блокировка через проекцию устраняет риск использования устаревшего состояния управляемой сущности при конкурентных выездах; ограничение уникальности БД остаётся окончательной защитой от дублирования счетов.
+- В счёте фиксируются фактический интервал, номер автомобиля, парковочное место, часовой пояс, длительности, ставки, составляющие стоимости, итог и валюта. Выписанная сумма не меняется после обновления конфигурации. Номер счёта стабильно выводится из идентификатора записи БД — отдельная последовательность не нужна.
+- Добавлены защищённые DTO API с проверкой владельца: история счетов, сведения о счёте и поиск по визиту. Отсутствующий и чужой счёт неразличимы для клиента; список загружает необходимые данные о визите одним запросом; GET-запросы не создают финансовые записи.
+- Существующий API стоимости визита теперь предпочитает сохранённый снимок счёта. Для старых завершённых визитов до V6 без снимка возможен расчёт по текущему тарифу, но такие суммы не выдаются за исторически выписанные счета и не записываются задним числом.
+- Добавлены PostgreSQL- и MockMvc-тесты неизменяемых снимков, прав доступа, стабильного порядка выдачи, старых визитов, ограничений, откатов, идемпотентной выдачи и двух конкурентных выездов с отдельными транзакциями без искусственных задержек.
 
-## Stage 10 — Authenticated Real-time Parking Updates
+## Этап №09 — Автоматизация броней и Email-напоминания
 
-- Added a native `/ws/parking` endpoint with STOMP and Spring's in-memory simple
-  broker. Authorized clients subscribe only to `/topic/parking/changes`; no
-  SockJS fallback, external broker, or parallel state store was introduced.
-- Reused the REST `JwtDecoder` in an inbound channel interceptor. JWT is
-  required in the STOMP `CONNECT` header, while anonymous subscriptions,
-  unknown destinations, client `SEND` commands, invalid signatures, expired
-  tokens, and unapproved Origins are rejected.
-- Added a minimal interval-independent event containing only reason, spot ID,
-  spot code, and occurrence time. Clients treat it as an invalidation hint and
-  reload their own interval through the existing REST availability endpoint.
-- Publish internal events inside business transactions and bridge them to STOMP
-  with an `AFTER_COMMIT` listener. Rollbacks emit nothing, while broker errors
-  are isolated from already committed reservation, visit, invoice, and cleanup
-  work.
-- Integrated actual hold creation/release/confirmation/expiration,
-  cancellation, no-show, walk-in or reserved entry, and invoice-backed exit.
-  Idempotent calls and repeated scheduler passes do not emit false changes.
-- Reworked hold and no-show cleanup to select bounded, locked reservation IDs
-  before entity transitions. This retains PostgreSQL `SKIP LOCKED`, preserves
-  lock ordering, and provides the exact affected spot for each committed event.
-- Added real random-port WebSocket tests with two STOMP clients plus controlled
-  JWT, Origin, forbidden destination/SEND, lifecycle, rollback, and reconnect
-  security scenarios. No external broker or timing sleeps are required.
-- Documented the simple broker's single-instance, non-durable delivery model:
-  missed messages are not replayed, so reconnecting clients must resynchronize
-  from PostgreSQL through REST.
+- Общее правило крайнего срока въезда: `min(endAt, startAt + 15 минут)`. Оно одинаково используется при въезде через шлагбаум, расчёте доступности, создании удержания, обновлении истории и автоматической отмене. Граница интервала везде трактуется одинаково.
+- Добавлена ограниченная по объёму очистка броней, по которым водитель не приехал (*no-show*), с `FOR UPDATE SKIP LOCKED` и обновлениями, защищёнными проверкой статуса. Въезд сохраняет порядок блокировок «место → автомобиль → бронь» и повторно читает состояние после получения блокировок.
+- Логическое истечение не зависит от момента срабатывания планировщика. Просроченная `ACTIVE`-бронь сразу перестаёт блокировать доступность, а при создании удержания её состояние сохраняется как `EXPIRED` до использования существующих ограничений исключения. Истечение no-show не создаёт визит, счёт или начисление.
+- Отдельный планировщик удержаний заменён небольшим настраиваемым координатором автоматизации. Правила временных удержаний не изменены; по умолчанию каждые 30 секунд вызываются очистка удержаний, обработка no-show и напоминаний.
+- Миграцией V7 добавлен PostgreSQL outbox уведомлений: для каждой брони допускается одна запись `RESERVATION_ENDING_SOON`. Введены допустимые состояния обработки, метаданные попыток и ошибок, индексы для безопасного захвата задач и повторных попыток.
+- Проверка права на напоминание, транзакционное состояние outbox, формирование письма и SMTP-отправка разделены на отдельные компоненты. SMTP вызывается за пределами транзакции БД, а право на отправку перепроверяется непосредственно перед отправлением.
+- Почта включается только явной конфигурацией, с проверкой параметров и конечными сетевыми тайм-аутами. Тесты и CI используют поддельный отправитель в памяти: внешний почтовый сервис и его учётные данные не нужны.
+- Задокументировано ограничение SMTP: уникальность в БД и захват строки обычно предотвращают дубли, но если процесс упадёт после принятия письма SMTP-сервером и до фиксации `SENT` в БД, повторная попытка всё ещё возможна. Поэтому абсолютная гарантия доставки «ровно один раз» не заявляется.
 
-## Stage 11 — Backend Hardening and Clean PostgreSQL Verification
+## Этап №10 — Защищённое обновление парковки в реальном времени
 
-- Audited the complete REST surface, DTO boundaries, unified error mapping,
-  owner-scoped queries, JWT decoder, STOMP interceptor, reservation and visit
-  locks, invoice immutability, scheduler paths, mail outbox, and Java Time
-  rules. Existing PostgreSQL and integration coverage already exercises the
-  required hold, no-show, walk-in, concurrent exit, reminder, and WebSocket
-  races, so those modules were not rewritten.
-- Found one frontend-blocking integration defect: Spring Security had no REST
-  CORS configuration even though the WebSocket endpoint validated Origins.
-  Added a dedicated, validated REST origin list, allowed only the existing
-  `GET`, `POST`, and preflight methods plus `Authorization`/`Content-Type`, and
-  kept wildcard origins forbidden. Two MockMvc preflight tests and one
-  property-validation test reproduce and protect the fix.
-- Removed implicit runtime and test database connection defaults. Application
-  startup now requires `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; integration
-  tests require the separate `TEST_DB_*` variables. This makes an accidental
-  connection to an unrelated local database less likely and produces an
-  immediate configuration error when required settings are absent.
-- Verified a genuinely empty PostgreSQL 14 database owned by a temporary,
-  non-superuser application role. Flyway installed the trusted `btree_gist`
-  extension, applied V1-V7, created all seven domain tables plus the expected
-  constraints and partial indexes, seeded exactly 20 spots, and passed
-  Hibernate `ddl-auto=validate`. Restarting retained seven migration rows and
-  20 spots without reapplying seed data.
-- Exercised the clean instance through real HTTP: registration, login, bearer
-  JWT, vehicle creation, 20-spot listing, interval availability, hold creation
-  and confirmation, reservation history, walk-in entry, double-entry refusal,
-  exit, repeated-exit refusal, visit history, invoice history, and stable
-  repeated invoice reads. Negative checks returned the established
-  400/401/404/409 contracts and approved REST preflight headers.
-- Re-ran the complete PostgreSQL suite: 159 tests passed with no failures,
-  errors, or skips. The smoke subset remains 22/22 and still covers real JWT,
-  concurrency, invoice, no-show, fake-mail, and two-client STOMP scenarios;
-  the CI workflow itself did not need modification.
-- Expanded the employer-facing setup guide with exact PostgreSQL ownership and
-  `btree_gist` requirements, mandatory runtime/test variables, REST and
-  WebSocket Origin separation, registration/login examples, clean migration
-  verification, and concrete startup troubleshooting.
-- Remaining limitations are intentional: no refresh token, external message
-  broker, durable WebSocket history, exactly-once SMTP guarantee, payment
-  processing, or frontend. Within the documented single-backend architecture,
-  the server contracts are ready for the React client.
+- Добавлена WebSocket-точка `/ws/parking` с STOMP и встроенным простым брокером Spring. Авторизованные клиенты подписываются только на `/topic/parking/changes`. Не добавлялись SockJS, внешний брокер или параллельное хранилище состояния.
+- В перехватчике входящего STOMP-канала повторно используется REST `JwtDecoder`. JWT требуется в заголовке STOMP `CONNECT`. Отклоняются анонимные подписки, неизвестные адреса, клиентские команды `SEND`, неправильные подписи, истёкшие токены и неразрешённые `Origin`.
+- Событие специально сделано минимальным и независимым от выбранного интервала: причина, ID места, код места и время события. Клиент воспринимает его как сигнал об устаревании данных и заново загружает доступность своего интервала через существующий REST API.
+- Внутренние события создаются в бизнес-транзакциях и отправляются в STOMP слушателем `AFTER_COMMIT`. После отката уведомление не публикуется; сбой брокера не отменяет уже зафиксированные изменения бронирования, визитов, счетов и очистки.
+- События подключены к реальным операциям: создание, освобождение, подтверждение и истечение удержания, отмена и no-show, въезд по брони и без неё, выезд с созданием счёта. Идемпотентные вызовы и повторные проходы планировщика не генерируют ложные изменения.
+- Очистка удержаний и no-show переработана: сначала выбирается ограниченная партия заблокированных ID броней, затем выполняются переходы статуса. Сохранены PostgreSQL `SKIP LOCKED` и порядок блокировок; для каждого подтверждённого события известна затронутая парковочная позиция.
+- Добавлены реальные WebSocket-тесты на случайном порту с двумя STOMP-клиентами, проверками JWT, `Origin`, запрещённых адресов и `SEND`, жизненного цикла, отката и повторного подключения. Внешний брокер и искусственные задержки не требуются.
+- Описано ограничение встроенного брокера: он рассчитан на один экземпляр сервера и не сохраняет историю доставки. Пропущенные сообщения не воспроизводятся, поэтому после переподключения клиент должен синхронизироваться с PostgreSQL через REST.
 
-## Stage 11-R — Backend Architecture Refactoring
+## Этап №11 — Стабилизация Backend и проверка чистой PostgreSQL
 
-- Normalized every feature into responsibility-focused packages such as
-  `controller`, `dto`, `mapper`, `service`, `repository`, `entity`, `model`,
-  and `config`. Cross-cutting scheduling remains in `automation`; no empty
-  layers or one-implementation service interfaces were added.
-- Added Lombok only for mechanical boilerplate: constructor injection, JPA
-  getters and protected no-argument constructors, and simple configuration
-  accessors. Explicit constructors remain where JWT and pricing configuration
-  validation protects invariants.
-- Added dedicated response mappers for auth, users, vehicles, parking spots,
-  reservations, barrier operations, visits, and invoices. Response DTOs no
-  longer import JPA entities, and controllers no longer call DTO factories.
-- Simplified `AuthService` to return domain results and moved visit-cost
-  selection from the controller into `ParkingVisitService`.
-- Kept `BarrierService` as the transaction-owning facade while moving entry
-  and exit orchestration into focused collaborators. Entry still uses
-  `noRollbackFor` for persisted no-show transitions; exit and invoice creation
-  remain one transaction with the established spot-to-vehicle lock order.
-- Extracted hold and no-show expiration into
-  `ReservationExpirationService`. Scheduler and request-time cleanup now share
-  one implementation without introducing independent nested transactions.
-  Reservation status methods apply one consistent source-state guard.
-- Removed repository and service methods with no production callers. Active
-  spot occupancy now uses an ID projection instead of loading complete visit
-  entities, while PostgreSQL exclusion constraints, partial unique indexes,
-  pessimistic locks, and Flyway V1-V7 remain unchanged.
-- Replaced six duplicated mutable clock implementations with one test fixture
-  and added coverage for sub-second tariff-boundary allocation. The final
-  PostgreSQL-backed build passed 160/160 tests; the unchanged smoke selection
-  passed 22/22, including JWT, concurrency, invoices, reminders, and STOMP.
-- REST endpoints, JSON fields, status codes, JWT rules, WebSocket endpoint and
-  topic, event reasons, tariffs, rounding, reservation timing, and historical
-  invoice semantics were preserved.
+- Проверены все REST-маршруты, границы DTO, единый формат ошибок, запросы в контексте владельца, JWT-декодер, STOMP-перехватчик, блокировки броней и визитов, неизменяемость счетов, задачи планировщика, почтовый outbox и правила Java Time. Уже существовавшие интеграционные тесты с PostgreSQL покрывали удержания, no-show, въезд без брони, конкурентный выезд, напоминания и гонки WebSocket. Переписывать эти модули не потребовалось.
+- Найдена ошибка интеграции, мешавшая Frontend: для REST в Spring Security не был настроен CORS, хотя WebSocket уже проверял `Origin`. Добавлен отдельный валидируемый список разрешённых источников для REST. Разрешены только нужные `GET`, `POST`, preflight и заголовки `Authorization`/`Content-Type`; wildcard-источники запрещены. Исправление закреплено двумя MockMvc-тестами preflight и одним тестом валидации настроек.
+- Удалены неявные значения подключения к рабочей и тестовой БД. Теперь приложение обязательно требует `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, а интеграционные тесты — отдельные `TEST_DB_*`. Это снижает риск случайного подключения к чужой локальной БД и помогает сразу увидеть ошибку конфигурации.
+- Проверен действительно пустой экземпляр PostgreSQL 14 под временным пользователем приложения без прав суперпользователя. Flyway установил разрешённое расширение `btree_gist`, применил V1–V7, создал семь доменных таблиц с ожидаемыми ограничениями и частичными индексами и ровно 20 парковочных мест. Валидация Hibernate `ddl-auto=validate` прошла. После перезапуска осталось семь записей миграций и 20 мест, без повторного добавления начальных данных.
+- На чистом экземпляре проверены реальные HTTP-запросы: регистрация, вход, Bearer JWT, добавление автомобиля, список 20 мест, доступность интервала, удержание и подтверждение, история броней, въезд без брони, запрет повторного въезда, выезд, запрет повторного выезда, история визитов и счетов, повторное чтение неизменного счёта. Негативные сценарии возвращали предусмотренные статусы 400/401/404/409, а REST preflight — корректные заголовки.
+- Повторно запущен полный набор PostgreSQL-тестов: **159 успешно, без ошибок и пропусков**. Подмножество smoke-тестов — **22 из 22**, включая JWT, конкуренцию, счета, no-show, поддельную почту и STOMP с двумя клиентами. Менять сам workflow CI не понадобилось.
+- Инструкция запуска для работодателя дополнена конкретными требованиями к PostgreSQL, владельцу БД и `btree_gist`, обязательными переменными рабочего и тестового окружения, отдельными Origin для REST и WebSocket, примерами регистрации и входа, проверкой миграций с нуля и рекомендациями по устранению ошибок запуска.
+- Ограничения на данном этапе оставлены сознательно: нет refresh token, внешнего брокера, долговременной истории WebSocket, абсолютной гарантии SMTP «ровно один раз», приёма оплаты и Frontend. В рамках одного экземпляра Backend серверные контракты готовы к подключению React-клиента.
 
-## Stages 12-15 — Complete React Frontend and Full-Stack Integration
+## Этап №11-R — Рефакторинг архитектуры Backend
 
-- Created a strict React, TypeScript, Vite, and Tailwind application around the
-  existing Backend contracts. Feature modules own auth, profile, vehicles,
-  parking, reservations, realtime, barrier, visits, and invoices; shared code
-  is limited to the typed API client, formatting, layout, and reusable UI.
-- Added session-scoped JWT authentication, protected routes, unified Russian
-  API errors, responsive navigation, loading/empty/error states, and targeted
-  TanStack Query keys instead of duplicating server state in React Context.
-- Implemented interval-aware 20-spot parking, server-backed three-minute holds,
-  countdown from `holdExpiresAt`, confirmation/release, reservation history,
-  and cancellation confirmation. The selected interval is part of the
-  availability query key and conflicts trigger a fresh REST read.
-- Connected STOMP with JWT in `CONNECT`, automatic reconnect, teardown on
-  logout, and REST invalidation after every parking event. A real two-session
-  browser check observed both hold creation and release without reloading.
-- Added the barrier simulator, active/completed visit history, automatic invoice
-  discovery, and saved day/night tariff details. Vehicle status compares the
-  Backend's normalized plate identity, avoiding stale entry controls when the
-  display plate contains spaces or separators.
-- Verified the layout at desktop and 390-pixel mobile widths. Fixed the invoice
-  detail's intrinsic grid sizing so the document has no horizontal overflow,
-  while keeping readable tariff columns and touch-sized controls.
-- Added focused Vitest/Testing Library coverage plus a separate Frontend CI
-  workflow. Updated both READMEs with real full-stack startup, user journeys,
-  WebSocket verification, tests, ports, and explicit product limitations.
+- Каждый функциональный модуль приведён к пакетам по ответственности: `controller`, `dto`, `mapper`, `service`, `repository`, `entity`, `model`, `config`. Общая плановая обработка осталась в `automation`. Пустые слои и сервисные интерфейсы с единственной реализацией намеренно не добавлялись.
+- Lombok применён только для механического шаблонного кода: внедрения зависимостей через конструктор, геттеров JPA, защищённых конструкторов без аргументов и простых методов доступа к настройкам. Явные конструкторы сохранены там, где валидация JWT и конфигурации тарифов защищает инварианты.
+- Добавлены отдельные мапперы ответов для аутентификации, пользователей, автомобилей, мест, броней, операций шлагбаума, визитов и счетов. DTO ответов больше не импортируют JPA-сущности, а контроллеры не вызывают фабричные методы DTO.
+- `AuthService` упрощён: он возвращает доменные результаты. Выбор расчёта стоимости визита перенесён из контроллера в `ParkingVisitService`.
+- `BarrierService` оставлен фасадом, владеющим транзакцией, но последовательность действий при въезде и выезде распределена между отдельными ответственными компонентами. Для въезда сохранён `noRollbackFor`, необходимый для фиксации переходов no-show; выезд и создание счёта по-прежнему проходят в одной транзакции с порядком блокировок «место → автомобиль».
+- Логика истечения удержаний и no-show вынесена в `ReservationExpirationService`. Планировщик и очистка при пользовательском запросе используют одну реализацию без независимых вложенных транзакций. Методы смены статуса брони одинаково проверяют допустимость перехода из исходного состояния.
+- Удалены методы репозиториев и сервисов, не использовавшиеся в рабочем коде. Для проверки текущей занятости места теперь используется проекция ID вместо загрузки полных сущностей визитов. Ограничения исключения PostgreSQL, частичные уникальные индексы, пессимистические блокировки и миграции V1–V7 не менялись.
+- Шесть дублировавшихся реализаций изменяемых часов в тестах заменены общей тестовой фикстурой. Добавлены проверки распределения времени на тарифной границе с точностью до долей секунды. Финальная сборка с PostgreSQL прошла **160 из 160 тестов**, неизменённый набор smoke-проверок — **22 из 22**, включая JWT, конкурентные запросы, счета, напоминания и STOMP.
+- Сохранены REST-маршруты, JSON-поля, HTTP-статусы, правила JWT, WebSocket-точка и тема, причины событий, тарифы, округление, временные правила бронирования и семантика исторических счетов.
+
+## Этапы №12–15 — React Frontend и полная интеграция
+
+- Создан Frontend на React, TypeScript со строгой типизацией, Vite и Tailwind, работающий с существующими контрактами Backend. Функциональные модули отвечают за авторизацию, профиль, автомобили, парковку, бронирование, события реального времени, шлагбаум, визиты и счета. Общий код ограничен типизированным API-клиентом, форматированием, компоновкой и переиспользуемыми элементами интерфейса.
+- Добавлены JWT-аутентификация в пределах сессии, защищённые маршруты, единые русскоязычные ошибки API, адаптивная навигация, состояния загрузки/пустого результата/ошибки и точечные ключи TanStack Query вместо копирования серверного состояния в React Context.
+- Реализована карта из 20 мест с учётом выбранного интервала, серверные удержания на три минуты, обратный отсчёт по `holdExpiresAt`, подтверждение и освобождение, история бронирований и подтверждение отмены. Выбранный интервал включён в ключ запроса доступности; при конфликте выполняется повторное чтение REST.
+- Подключён STOMP с JWT в `CONNECT`, автоматическим переподключением, отключением при выходе из аккаунта и инвалидированием REST-данных при каждом событии парковки. При проверке в двух настоящих браузерных сессиях создание и освобождение удержания отображались без перезагрузки.
+- Добавлены симулятор шлагбаума, история активных и завершённых визитов, автоматическое обнаружение счёта и сохранённая детализация дневного/ночного тарифа. Состояние автомобиля сопоставляется с нормализованным номером из Backend, чтобы элементы управления въездом не устаревали из-за пробелов или разделителей в отображаемом номере.
+- Проверена компоновка на широком экране и при ширине мобильного экрана 390 пикселей. Исправлен внутренний размер CSS Grid в деталях счёта: горизонтальная прокрутка всей страницы устранена, при этом столбцы тарификации остались читаемыми, а элементы управления — удобными для касания.
+- Добавлены целевые тесты на Vitest и Testing Library и отдельный workflow Frontend CI. Обновлены оба README: реальный запуск полного приложения, пользовательские сценарии, проверка WebSocket, тесты, порты и известные ограничения продукта.
+
+---
+
