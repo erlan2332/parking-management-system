@@ -21,6 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    env:
+      VITE_API_BASE_URL: https://parking-management-backend-erlan2332.onrender.com
+      VITE_WS_URL: wss://parking-management-backend-erlan2332.onrender.com/ws/parking
+
     defaults:
       run:
         working-directory: parking-frontend
